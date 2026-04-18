@@ -1,0 +1,29 @@
+version: '3.8'
+
+services:
+    db:
+        image: postgres:16-alpine
+        container_name: vertexNewsParser_db
+        restart: unless-stopped
+        environment:
+            POSTGRES_USER: vnp_user
+            POSTGRES_PASSWORD: vnp_secret
+            POSTGRES_DB: vnp_db
+        volumes:
+            - pg_data:/var/lib/postgresql/data
+        ports:
+            - "5432:5432"
+
+    parser:
+        build: .
+        container_name: vertexNewsParser
+        restart: unless-stopped
+        depends_on:
+            - db
+        env_file:
+            - .env
+        volumes:
+            - ./.env:/app/.env:ro
+
+volumes:
+    pg_data:
