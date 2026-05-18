@@ -4,7 +4,7 @@ import (
 	"context"
 	"log"
 	"time"
-	"vertexNewsParser/internal"
+	"vertexNewsParser/internal/news"
 
 	"github.com/joho/godotenv"
 )
@@ -19,23 +19,23 @@ func main() {
 	log.Println("vertexNewsParser starting...")
 
 	ctx := context.Background()
-	pool := internal.MustConnectDB(ctx)
+	pool := news.MustConnectDB(ctx)
 	defer pool.Close()
 
-	internal.MustInitDB(ctx, pool)
-	internal.SeedSources(ctx, pool) // загружает из env при каждом старте
+	news.MustInitDB(ctx, pool)
+	news.SeedSources(ctx, pool)
 
-	fp := internal.NewFeedParser()
+	fp := news.NewFeedParser()
 
-	interval := internal.GetEnvDuration("PARSE_INTERVAL", 10*time.Minute)
+	interval := news.GetEnvDuration("PARSE_INTERVAL", 10*time.Minute)
 	log.Printf("Parsing interval: %v", interval)
 
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 
-	internal.RunParse(ctx, pool, fp) // первый запуск сразу
+	news.RunParse(ctx, pool, fp)
 
 	for range ticker.C {
-		internal.RunParse(ctx, pool, fp)
+		news.RunParse(ctx, pool, fp)
 	}
 }

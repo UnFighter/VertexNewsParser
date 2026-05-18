@@ -1,4 +1,4 @@
-package internal
+package news
 
 import (
 	"crypto/sha1"
