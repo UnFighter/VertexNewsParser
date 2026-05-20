@@ -6,9 +6,12 @@ import (
 	"sync"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/mmcdole/gofeed"
 )
+
+const maxConcurrentSources = 10
 
 func NewFeedParser() *gofeed.Parser {
 	fp := gofeed.NewParser()
@@ -41,11 +44,14 @@ func RunParse(ctx context.Context, pool *pgxpool.Pool, fp *gofeed.Parser) {
 
 	log.Printf("Found %d active sources", len(sources))
 
+	sem := make(chan struct{}, maxConcurrentSources)
 	var wg sync.WaitGroup
 	for _, src := range sources {
 		wg.Add(1)
+		sem <- struct{}{}
 		go func(s Source) {
 			defer wg.Done()
+			defer func() { <-sem }()
 			parseSource(ctx, pool, fp, s)
 		}(src)
 	}
@@ -63,12 +69,16 @@ func parseSource(ctx context.Context, pool *pgxpool.Pool, fp *gofeed.Parser, src
 		return
 	}
 
+	const query = `
+		INSERT INTO news (source_id, source_name, title, link, description, raw_json, title_hash, published_at, categories)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+		ON CONFLICT (title_hash) DO NOTHING`
+
+	batch := &pgx.Batch{}
 	for _, item := range feed.Items {
 		if item.Title == "" {
 			continue
 		}
-
-		titleHash := hashTitle(item.Title)
 
 		publishedAt := time.Now()
 		if item.PublishedParsed != nil {
@@ -80,27 +90,35 @@ func parseSource(ctx context.Context, pool *pgxpool.Pool, fp *gofeed.Parser, src
 			desc = sanitizeAndTruncate(item.Description, 500)
 		}
 
-		title := sanitizeAndTruncate(item.Title, 500)
-
-		_, err := pool.Exec(ctx, `
-			INSERT INTO news (source_id, source_name, title, link, description, raw_json, title_hash, published_at, categories)
-			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-			ON CONFLICT (title_hash) DO NOTHING`,
+		batch.Queue(query,
 			src.ID,
 			src.Name,
-			title,
+			sanitizeAndTruncate(item.Title, 500),
 			item.Link,
 			desc,
-			item, // сохраняем весь item как JSONB
-			titleHash,
+			item,
+			hashTitle(item.Title),
 			publishedAt,
 			item.Categories,
 		)
+	}
 
-		if err != nil {
-			log.Printf("Error saving news '%s' from %s: %v", title, src.Name, err)
+	if batch.Len() == 0 {
+		log.Printf("Finished %s → 0 items", src.Name)
+		return
+	}
+
+	br := pool.SendBatch(ctx, batch)
+	defer br.Close()
+
+	saved := 0
+	for i := 0; i < batch.Len(); i++ {
+		if _, err := br.Exec(); err != nil {
+			log.Printf("Error saving item from %s: %v", src.Name, err)
+		} else {
+			saved++
 		}
 	}
 
-	log.Printf("Finished %s → %d items", src.Name, len(feed.Items))
+	log.Printf("Finished %s → %d/%d items saved", src.Name, saved, batch.Len())
 }

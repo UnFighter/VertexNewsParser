@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 	"time"
+	"vertexNewsParser/internal/impact"
 	"vertexNewsParser/internal/news"
 
 	"github.com/joho/godotenv"
@@ -26,6 +27,7 @@ func main() {
 	news.SeedSources(ctx, pool)
 
 	fp := news.NewFeedParser()
+	impactSvc := impact.NewService(pool)
 
 	interval := news.GetEnvDuration("PARSE_INTERVAL", 10*time.Minute)
 	log.Printf("Parsing interval: %v", interval)
@@ -33,9 +35,15 @@ func main() {
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 
-	news.RunParse(ctx, pool, fp)
-
-	for range ticker.C {
+	parse := func() {
 		news.RunParse(ctx, pool, fp)
+		if err := impactSvc.Run(ctx, 24*time.Hour); err != nil {
+			log.Printf("Impact calculation error: %v", err)
+		}
+	}
+
+	parse()
+	for range ticker.C {
+		parse()
 	}
 }

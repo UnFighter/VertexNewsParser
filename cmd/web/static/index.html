@@ -1,0 +1,496 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Vertex — Влияние новостей на акции</title>
+  <script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:       #0d1117;
+      --surface:  #161b22;
+      --border:   #30363d;
+      --muted:    #8b949e;
+      --text:     #e6edf3;
+      --blue:     #58a6ff;
+      --green:    #3fb950;
+      --red:      #f85149;
+      --purple:   #bc8cff;
+    }
+
+    html, body { height: 100%; overflow: hidden; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      font-size: 13px;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── Header ── */
+    header {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      padding: 10px 20px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+
+    .logo {
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--blue);
+      letter-spacing: -0.5px;
+    }
+
+    .ticker-select {
+      background: var(--bg);
+      color: var(--text);
+      border: 1px solid var(--border);
+      padding: 5px 10px;
+      border-radius: 6px;
+      font-size: 13px;
+      cursor: pointer;
+      outline: none;
+    }
+    .ticker-select:focus { border-color: var(--blue); }
+
+    .price-info {
+      margin-left: auto;
+      display: flex;
+      align-items: baseline;
+      gap: 10px;
+    }
+    .price-val { font-size: 20px; font-weight: 600; }
+    .price-chg { font-size: 13px; font-weight: 500; }
+    .up   { color: var(--green); }
+    .down { color: var(--red); }
+    .flat { color: var(--muted); }
+
+    /* ── Layout ── */
+    main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    #chart-wrap {
+      flex: 0 0 54%;
+      min-height: 0;
+      position: relative;
+    }
+
+    #chart { width: 100%; height: 100%; }
+
+    /* ── News Panel ── */
+    .news-panel {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      border-top: 1px solid var(--border);
+    }
+
+    .news-panel-head {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 8px 16px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+
+    .news-panel-head span {
+      font-weight: 600;
+      color: var(--muted);
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    #news-count {
+      background: var(--border);
+      color: var(--muted);
+      padding: 1px 7px;
+      border-radius: 10px;
+      font-size: 11px;
+    }
+
+    .news-scroll { flex: 1; overflow-y: auto; }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    thead th {
+      position: sticky;
+      top: 0;
+      background: var(--surface);
+      padding: 7px 14px;
+      text-align: left;
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+      border-bottom: 1px solid var(--border);
+      z-index: 5;
+      white-space: nowrap;
+    }
+
+    tbody tr {
+      border-bottom: 1px solid #21262d;
+      transition: background 0.1s;
+      cursor: pointer;
+    }
+    tbody tr:hover { background: var(--surface); }
+
+    td { padding: 7px 14px; vertical-align: middle; }
+
+    .td-title { max-width: 380px; }
+    .td-title a {
+      color: var(--text);
+      text-decoration: none;
+      display: block;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .td-title a:hover { color: var(--blue); text-decoration: underline; }
+
+    .td-source { color: var(--muted); white-space: nowrap; }
+    .td-time   { color: var(--muted); white-space: nowrap; }
+
+    .impact-num {
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+      text-align: right;
+      display: block;
+      min-width: 55px;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 2px 7px;
+      border-radius: 10px;
+      font-size: 11px;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+    .b-extreme { background: rgba(248,81,73,.15);  color: #ff7b72; }
+    .b-strong  { background: rgba(188,140,255,.15); color: var(--purple); }
+    .b-medium  { background: rgba(88,166,255,.15); color: var(--blue); }
+    .b-weak    { background: rgba(139,148,158,.15); color: var(--muted); }
+
+    .dir-positive { color: var(--green); }
+    .dir-negative { color: var(--red); }
+    .dir-neutral  { color: var(--muted); }
+
+    /* ── Empty / Loading ── */
+    .state-box {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      height: 100%;
+      color: var(--muted);
+      padding: 24px;
+    }
+    .state-box svg { opacity: 0.25; }
+    .state-box p { font-size: 14px; }
+    .state-box small { font-size: 11px; opacity: 0.7; }
+
+    /* ── Spinner ── */
+    .spinner {
+      width: 20px; height: 20px;
+      border: 2px solid var(--border);
+      border-top-color: var(--blue);
+      border-radius: 50%;
+      animation: spin .7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Scrollbar ── */
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+  </style>
+</head>
+<body>
+
+<header>
+  <span class="logo">Vertex</span>
+  <select class="ticker-select" id="ticker-select">
+    <option>Загрузка...</option>
+  </select>
+  <div class="price-info">
+    <span class="price-val" id="price-val">—</span>
+    <span class="price-chg flat" id="price-chg"></span>
+  </div>
+</header>
+
+<main>
+  <div id="chart-wrap">
+    <div id="chart"></div>
+  </div>
+
+  <div class="news-panel">
+    <div class="news-panel-head">
+      <span>Новости</span>
+      <span id="news-count">0</span>
+    </div>
+    <div class="news-scroll">
+      <div id="news-body">
+        <div class="state-box">
+          <div class="spinner"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<script>
+// ─── Chart setup ──────────────────────────────────────────────────
+const chartEl = document.getElementById('chart');
+const chart = LightweightCharts.createChart(chartEl, {
+  layout:    { background: { color: '#0d1117' }, textColor: '#8b949e' },
+  grid:      { vertLines: { color: '#1c2128' }, horzLines: { color: '#1c2128' } },
+  crosshair: { mode: LightweightCharts.CrosshairMode.Normal },
+  rightPriceScale: { borderColor: '#30363d' },
+  timeScale: { borderColor: '#30363d', timeVisible: true, secondsVisible: false },
+});
+
+const candleSeries = chart.addCandlestickSeries({
+  upColor:      '#3fb950',
+  downColor:    '#f85149',
+  borderVisible: false,
+  wickUpColor:  '#3fb950',
+  wickDownColor: '#f85149',
+});
+
+// fallback line series (если нет свечей)
+const lineSeries = chart.addLineSeries({ color: '#58a6ff', lineWidth: 2 });
+lineSeries.applyOptions({ visible: false });
+
+new ResizeObserver(() => {
+  const w = document.getElementById('chart-wrap');
+  chart.applyOptions({ width: w.clientWidth, height: w.clientHeight });
+}).observe(document.getElementById('chart-wrap'));
+
+// ─── State ────────────────────────────────────────────────────────
+let currentTicker = null;
+
+// ─── Init ─────────────────────────────────────────────────────────
+async function init() {
+  try {
+    const res = await fetch('/api/tickers');
+    const tickers = await res.json();
+    const sel = document.getElementById('ticker-select');
+    sel.innerHTML = '';
+
+    if (!tickers || tickers.length === 0) {
+      sel.innerHTML = '<option>Нет данных</option>';
+      showNewsEmpty('Нет данных о тикерах', 'Запустите cmd/api для загрузки справочника акций');
+      return;
+    }
+
+    tickers.forEach(t => {
+      const opt = document.createElement('option');
+      opt.value = t.ticker;
+      opt.textContent = t.short_name && t.short_name !== t.ticker
+        ? `${t.ticker} · ${t.short_name}`
+        : t.ticker;
+      sel.appendChild(opt);
+    });
+
+    sel.addEventListener('change', () => loadData(sel.value));
+    loadData(tickers[0].ticker);
+  } catch (e) {
+    showNewsEmpty('Ошибка подключения', 'Не удалось загрузить список тикеров');
+  }
+}
+
+// ─── Load ticker data ─────────────────────────────────────────────
+async function loadData(ticker) {
+  currentTicker = ticker;
+  document.getElementById('news-body').innerHTML = '<div class="state-box"><div class="spinner"></div></div>';
+  document.getElementById('price-val').textContent = '—';
+  document.getElementById('price-chg').textContent = '';
+
+  const [candlesRes, impactRes, priceRes] = await Promise.all([
+    fetch(`/api/candles?ticker=${ticker}`),
+    fetch(`/api/news-impact?ticker=${ticker}`),
+    fetch(`/api/current-price?ticker=${ticker}`),
+  ]);
+
+  const candles = await candlesRes.json().catch(() => []);
+  const impacts = await impactRes.json().catch(() => []);
+  const price   = await priceRes.json().catch(() => null);
+
+  if (ticker !== currentTicker) return; // отменено, пока загружали
+
+  renderPrice(price);
+  renderChart(candles || [], impacts || []);
+  renderNews(impacts || []);
+}
+
+// ─── Price badge ──────────────────────────────────────────────────
+function renderPrice(p) {
+  const valEl = document.getElementById('price-val');
+  const chgEl = document.getElementById('price-chg');
+
+  if (!p || !p.last_price) {
+    valEl.textContent = '—';
+    chgEl.textContent = '';
+    return;
+  }
+
+  valEl.textContent = p.last_price.toFixed(2) + ' ₽';
+
+  const sign = p.change >= 0 ? '+' : '';
+  chgEl.textContent = `${sign}${p.change.toFixed(2)} (${sign}${p.change_percent.toFixed(2)}%)`;
+  chgEl.className = 'price-chg ' + (p.change > 0 ? 'up' : p.change < 0 ? 'down' : 'flat');
+}
+
+// ─── Chart ────────────────────────────────────────────────────────
+function renderChart(candles, impacts) {
+  candleSeries.setMarkers([]);
+
+  if (candles.length === 0) {
+    candleSeries.setData([]);
+    lineSeries.applyOptions({ visible: false });
+    return;
+  }
+
+  candleSeries.setData(candles);
+  lineSeries.applyOptions({ visible: false });
+
+  // markers — сортируем по времени (обязательно)
+  if (impacts.length > 0) {
+    const markers = impacts
+      .map(item => ({
+        time:     item.published_at,
+        position: item.direction === 'positive' ? 'belowBar' : 'aboveBar',
+        color:    dirColor(item.direction),
+        shape:    item.direction === 'positive' ? 'arrowUp' : item.direction === 'negative' ? 'arrowDown' : 'circle',
+        text:     (item.impact > 0 ? '+' : '') + item.impact.toFixed(2),
+        size:     strengthSize(item.strength),
+      }))
+      .sort((a, b) => a.time - b.time);
+
+    candleSeries.setMarkers(markers);
+  }
+
+  chart.timeScale().fitContent();
+}
+
+function dirColor(dir) {
+  return dir === 'positive' ? '#3fb950' : dir === 'negative' ? '#f85149' : '#8b949e';
+}
+
+function strengthSize(s) {
+  return s === 'extreme' ? 3 : s === 'strong' ? 2 : 1;
+}
+
+// ─── News table ───────────────────────────────────────────────────
+function renderNews(impacts) {
+  document.getElementById('news-count').textContent = impacts.length;
+
+  if (impacts.length === 0) {
+    showNewsEmpty(
+      'Нет данных о влиянии',
+      'Запустите cmd/parser для парсинга новостей'
+    );
+    return;
+  }
+
+  const rows = impacts.map(item => {
+    const dt    = new Date(item.published_at * 1000);
+    const dStr  = dt.toLocaleString('ru-RU', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' });
+    const sign  = item.impact >= 0 ? '+' : '';
+    const dCls  = `dir-${item.direction}`;
+    const bCls  = `badge b-${item.strength}`;
+    const impact = `${sign}${item.impact.toFixed(3)}`;
+
+    return `<tr onclick="jumpToTime(${item.published_at})">
+      <td class="td-title">
+        <a href="${esc(item.link)}" target="_blank" rel="noopener">${esc(item.title)}</a>
+      </td>
+      <td class="td-source">${esc(item.source_name)}</td>
+      <td class="td-time">${dStr}</td>
+      <td style="text-align:right">
+        <span class="impact-num ${dCls}">${impact}</span>
+      </td>
+      <td><span class="${bCls}">${item.strength}</span></td>
+      <td><span class="${dCls}">${dirIcon(item.direction)} ${item.direction}</span></td>
+    </tr>`;
+  }).join('');
+
+  document.getElementById('news-body').innerHTML = `
+    <table>
+      <thead>
+        <tr>
+          <th>Заголовок</th>
+          <th>Источник</th>
+          <th>Время</th>
+          <th style="text-align:right">Impact</th>
+          <th>Сила</th>
+          <th>Направление</th>
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+}
+
+function dirIcon(dir) {
+  return dir === 'positive' ? '↑' : dir === 'negative' ? '↓' : '○';
+}
+
+function showNewsEmpty(title, hint) {
+  document.getElementById('news-count').textContent = '0';
+  document.getElementById('news-body').innerHTML = `
+    <div class="state-box">
+      <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+        <path stroke-linecap="round" stroke-linejoin="round"
+          d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293
+             l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+      </svg>
+      <p>${esc(title)}</p>
+      <small>${esc(hint)}</small>
+    </div>`;
+}
+
+// ─── Interactivity ────────────────────────────────────────────────
+function jumpToTime(ts) {
+  try {
+    chart.timeScale().scrollToPosition(0, false);
+    const coord = chart.timeScale().timeToCoordinate(ts);
+    if (coord !== null) chart.timeScale().scrollToRealTime();
+  } catch (_) {}
+}
+
+// ─── Utils ────────────────────────────────────────────────────────
+function esc(str) {
+  if (!str) return '';
+  return String(str)
+    .replace(/&/g,'&amp;')
+    .replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;');
+}
+
+// ─── Start ────────────────────────────────────────────────────────
+init();
+</script>
+</body>
+</html>

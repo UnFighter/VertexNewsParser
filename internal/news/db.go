@@ -62,6 +62,22 @@ func MustInitDB(ctx context.Context, pool *pgxpool.Pool) {
 
 		CREATE INDEX IF NOT EXISTS idx_news_published ON news(published_at DESC);
 		CREATE INDEX IF NOT EXISTS idx_news_hash ON news(title_hash);
+
+		CREATE TABLE IF NOT EXISTS news_impact (
+			id              SERIAL PRIMARY KEY,
+			news_id         INT NOT NULL,
+			ticker          TEXT NOT NULL,
+			impact          DOUBLE PRECISION NOT NULL,
+			direction       TEXT NOT NULL,
+			strength        TEXT NOT NULL,
+			quality_score   DOUBLE PRECISION NOT NULL,
+			market_response DOUBLE PRECISION NOT NULL,
+			sentiment       DOUBLE PRECISION NOT NULL,
+			calculated_at   TIMESTAMPTZ DEFAULT NOW(),
+			UNIQUE (news_id, ticker)
+		);
+		CREATE INDEX IF NOT EXISTS idx_news_impact_ticker  ON news_impact(ticker);
+		CREATE INDEX IF NOT EXISTS idx_news_impact_news_id ON news_impact(news_id);
 	`)
 	if err != nil {
 		log.Fatal("DB init error:", err)
