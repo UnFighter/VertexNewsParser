@@ -27,14 +27,15 @@ type NewsImpactResult struct {
 }
 
 type NewsImpactRecord struct {
-	NewsID         int
-	Ticker         string
-	Impact         float64
-	Direction      string
-	Strength       string
-	QualityScore   float64
-	MarketResponse float64
-	Sentiment      float64
+	NewsID          int
+	Ticker          string
+	Impact          float64
+	Direction       string
+	Strength        string
+	QualityScore    float64
+	MarketResponse  float64
+	Sentiment       float64
+	TickerMentioned bool
 }
 
 type newsItem struct {
@@ -49,4 +50,6 @@ type marketMetrics struct {
 	Ticker        string
 	ChangePercent float64
 	VolumeRatio   float64
+	ShortName     string
+	Name          string
 }

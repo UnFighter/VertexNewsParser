@@ -1,496 +1,1311 @@
 <!DOCTYPE html>
-<html lang="ru">
+<html lang="ru" class="dark">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Vertex — Влияние новостей на акции</title>
+  <title>NewsImpact Analyzer</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
   <style>
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-    :root {
-      --bg:       #0d1117;
-      --surface:  #161b22;
-      --border:   #30363d;
-      --muted:    #8b949e;
-      --text:     #e6edf3;
-      --blue:     #58a6ff;
-      --green:    #3fb950;
-      --red:      #f85149;
-      --purple:   #bc8cff;
-    }
-
-    html, body { height: 100%; overflow: hidden; }
-
-    body {
-      background: var(--bg);
-      color: var(--text);
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      font-size: 13px;
-      display: flex;
-      flex-direction: column;
-    }
-
-    /* ── Header ── */
-    header {
-      display: flex;
-      align-items: center;
-      gap: 16px;
-      padding: 10px 20px;
-      background: var(--surface);
-      border-bottom: 1px solid var(--border);
-      flex-shrink: 0;
-    }
-
-    .logo {
-      font-size: 16px;
-      font-weight: 700;
-      color: var(--blue);
-      letter-spacing: -0.5px;
-    }
-
-    .ticker-select {
-      background: var(--bg);
-      color: var(--text);
-      border: 1px solid var(--border);
-      padding: 5px 10px;
-      border-radius: 6px;
-      font-size: 13px;
-      cursor: pointer;
-      outline: none;
-    }
-    .ticker-select:focus { border-color: var(--blue); }
-
-    .price-info {
-      margin-left: auto;
-      display: flex;
-      align-items: baseline;
-      gap: 10px;
-    }
-    .price-val { font-size: 20px; font-weight: 600; }
-    .price-chg { font-size: 13px; font-weight: 500; }
-    .up   { color: var(--green); }
-    .down { color: var(--red); }
-    .flat { color: var(--muted); }
-
-    /* ── Layout ── */
-    main {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      overflow: hidden;
-    }
-
-    #chart-wrap {
-      flex: 0 0 54%;
-      min-height: 0;
-      position: relative;
-    }
-
-    #chart { width: 100%; height: 100%; }
-
-    /* ── News Panel ── */
-    .news-panel {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      overflow: hidden;
-      border-top: 1px solid var(--border);
-    }
-
-    .news-panel-head {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      padding: 8px 16px;
-      background: var(--surface);
-      border-bottom: 1px solid var(--border);
-      flex-shrink: 0;
-    }
-
-    .news-panel-head span {
-      font-weight: 600;
-      color: var(--muted);
-      font-size: 11px;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-    }
-
-    #news-count {
-      background: var(--border);
-      color: var(--muted);
-      padding: 1px 7px;
-      border-radius: 10px;
-      font-size: 11px;
-    }
-
-    .news-scroll { flex: 1; overflow-y: auto; }
-
-    table {
-      width: 100%;
-      border-collapse: collapse;
-    }
-
-    thead th {
-      position: sticky;
-      top: 0;
-      background: var(--surface);
-      padding: 7px 14px;
-      text-align: left;
-      font-size: 11px;
-      font-weight: 600;
-      color: var(--muted);
-      text-transform: uppercase;
-      letter-spacing: 0.4px;
-      border-bottom: 1px solid var(--border);
-      z-index: 5;
-      white-space: nowrap;
-    }
-
-    tbody tr {
-      border-bottom: 1px solid #21262d;
-      transition: background 0.1s;
-      cursor: pointer;
-    }
-    tbody tr:hover { background: var(--surface); }
-
-    td { padding: 7px 14px; vertical-align: middle; }
-
-    .td-title { max-width: 380px; }
-    .td-title a {
-      color: var(--text);
-      text-decoration: none;
-      display: block;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-    .td-title a:hover { color: var(--blue); text-decoration: underline; }
-
-    .td-source { color: var(--muted); white-space: nowrap; }
-    .td-time   { color: var(--muted); white-space: nowrap; }
-
-    .impact-num {
-      font-weight: 700;
-      font-variant-numeric: tabular-nums;
-      text-align: right;
-      display: block;
-      min-width: 55px;
-    }
-
-    .badge {
-      display: inline-block;
-      padding: 2px 7px;
-      border-radius: 10px;
-      font-size: 11px;
-      font-weight: 600;
-      white-space: nowrap;
-    }
-    .b-extreme { background: rgba(248,81,73,.15);  color: #ff7b72; }
-    .b-strong  { background: rgba(188,140,255,.15); color: var(--purple); }
-    .b-medium  { background: rgba(88,166,255,.15); color: var(--blue); }
-    .b-weak    { background: rgba(139,148,158,.15); color: var(--muted); }
-
-    .dir-positive { color: var(--green); }
-    .dir-negative { color: var(--red); }
-    .dir-neutral  { color: var(--muted); }
-
-    /* ── Empty / Loading ── */
-    .state-box {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      gap: 8px;
-      height: 100%;
-      color: var(--muted);
-      padding: 24px;
-    }
-    .state-box svg { opacity: 0.25; }
-    .state-box p { font-size: 14px; }
-    .state-box small { font-size: 11px; opacity: 0.7; }
-
-    /* ── Spinner ── */
-    .spinner {
-      width: 20px; height: 20px;
-      border: 2px solid var(--border);
-      border-top-color: var(--blue);
-      border-radius: 50%;
-      animation: spin .7s linear infinite;
-    }
-    @keyframes spin { to { transform: rotate(360deg); } }
-
-    /* ── Scrollbar ── */
-    ::-webkit-scrollbar { width: 6px; }
+    *, *::before, *::after { box-sizing: border-box; }
+    body { font-family: 'Inter', system-ui, -apple-system, sans-serif; -webkit-font-smoothing: antialiased; }
+    .font-mono { font-family: 'JetBrains Mono', 'SF Mono', Consolas, monospace !important; }
+    input, button, select { font-family: inherit; }
+    ::-webkit-scrollbar { width: 5px; height: 5px; }
     ::-webkit-scrollbar-track { background: transparent; }
-    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+    ::-webkit-scrollbar-thumb { background: rgba(75,85,99,0.4); border-radius: 9999px; }
+    ::-webkit-scrollbar-thumb:hover { background: rgba(75,85,99,0.7); }
+    .candle-bar { transition: transform 150ms; }
+    .candle-bar:hover { transform: scaleX(1.2); }
+    .impact-bar-fill { transition: width 500ms ease; }
+    .event-card { transition: all 150ms ease; }
+    .event-card:hover .impact-bar-fill { width: 100% !important; }
+    #lw-chart { width: 100%; height: 320px; }
+    .page { display: none; }
+    .page.active { display: block; }
+    .dropdown-menu { display: none; }
+    .dropdown-menu.open { display: block; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .spinner { animation: spin 0.7s linear infinite; }
+    .stat-row:last-child { border-bottom: none !important; }
   </style>
 </head>
-<body>
+<body class="bg-[#0A0E1A] text-[#F9FAFB] min-h-screen">
 
-<header>
-  <span class="logo">Vertex</span>
-  <select class="ticker-select" id="ticker-select">
-    <option>Загрузка...</option>
-  </select>
-  <div class="price-info">
-    <span class="price-val" id="price-val">—</span>
-    <span class="price-chg flat" id="price-chg"></span>
-  </div>
-</header>
+<!-- ═══════════════════════════════════════════════
+     LANDING PAGE
+════════════════════════════════════════════════ -->
+<div id="page-landing" class="page active">
 
-<main>
-  <div id="chart-wrap">
-    <div id="chart"></div>
-  </div>
+  <!-- Header -->
+  <header class="sticky top-0 z-50 border-b border-[rgba(75,85,99,0.4)] bg-[rgba(31,41,55,0.6)] backdrop-blur-md">
+    <div class="max-w-7xl mx-auto px-6">
+      <div class="flex items-center justify-between h-16">
 
-  <div class="news-panel">
-    <div class="news-panel-head">
-      <span>Новости</span>
-      <span id="news-count">0</span>
+        <!-- Logo -->
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-lg bg-[#3B82F6] flex items-center justify-center flex-shrink-0">
+            <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M3 3v18h18"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></svg>
+          </div>
+          <div>
+            <div class="font-bold text-lg leading-none">NewsImpact</div>
+            <div class="text-[10px] text-[#9CA3AF] tracking-widest mt-0.5">ANALYZER</div>
+          </div>
+        </div>
+
+        <!-- Nav -->
+        <nav class="hidden md:flex items-center gap-8">
+          <div class="relative" id="products-wrap">
+            <button onclick="toggleDropdown('products-menu')" class="text-sm font-medium text-[#9CA3AF] hover:text-[#F9FAFB] transition-colors flex items-center gap-1">
+              ПРОДУКТЫ
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg>
+            </button>
+            <div id="products-menu" class="dropdown-menu absolute top-full mt-2 left-0 w-48 bg-[#1F2937] border border-[rgba(75,85,99,0.4)] rounded-lg shadow-xl p-2 z-50">
+              <button class="w-full text-left px-4 py-2 text-sm hover:bg-[#374151] rounded-md transition-colors">Акции</button>
+              <button class="w-full text-left px-4 py-2 text-sm hover:bg-[#374151] rounded-md transition-colors">Облигации</button>
+              <button class="w-full text-left px-4 py-2 text-sm hover:bg-[#374151] rounded-md transition-colors">Валюта</button>
+            </div>
+          </div>
+          <button onclick="showNews()" class="text-sm font-medium text-[#9CA3AF] hover:text-[#F9FAFB] transition-colors">НОВОСТИ</button>
+          <a href="#" class="text-sm font-medium text-[#9CA3AF] hover:text-[#F9FAFB] transition-colors">ИЗБРАННОЕ</a>
+        </nav>
+
+        <!-- User -->
+        <div class="flex items-center gap-4">
+          <div class="text-sm text-[#9CA3AF] hidden md:block">Россия</div>
+          <div class="relative" id="user-wrap">
+            <button onclick="toggleDropdown('user-menu')" class="w-10 h-10 rounded-full bg-[#374151] hover:bg-[#4B5563] flex items-center justify-center transition-colors">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+            </button>
+            <div id="user-menu" class="dropdown-menu absolute top-full mt-2 right-0 w-56 bg-[#1F2937] border border-[rgba(75,85,99,0.4)] rounded-lg shadow-xl p-2 z-50">
+              <button onclick="showDashboard()" class="w-full text-left px-4 py-2.5 text-sm font-medium hover:bg-[#374151] rounded-md transition-colors border-b border-[rgba(75,85,99,0.4)] mb-1 pb-3">
+                Войти
+              </button>
+              <button class="w-full text-left px-4 py-2.5 text-sm hover:bg-[#374151] rounded-md transition-colors">Создать аккаунт</button>
+              <div class="mt-2 pt-2 border-t border-[rgba(75,85,99,0.4)] px-4 py-2">
+                <div class="flex items-center justify-between text-xs text-[#9CA3AF]">
+                  <span>Тёмная тема</span>
+                  <div class="w-10 h-5 bg-[#3B82F6] rounded-full relative flex-shrink-0">
+                    <div class="w-4 h-4 bg-white rounded-full absolute top-0.5 right-0.5"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
     </div>
-    <div class="news-scroll">
-      <div id="news-body">
-        <div class="state-box">
-          <div class="spinner"></div>
+  </header>
+
+  <!-- Hero -->
+  <main class="max-w-7xl mx-auto px-6 py-16">
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+
+      <!-- Left -->
+      <div>
+        <h1 class="text-5xl font-bold mb-4 leading-tight">
+          Один инструмент<br>
+          <span class="text-[#3B82F6]">для анализа</span> всего
+        </h1>
+        <p class="text-lg text-[#9CA3AF] mb-8">
+          Отслеживайте влияние новостей на цены акций МОЭКС в режиме реального времени
+        </p>
+
+        <!-- Search -->
+        <div class="relative mb-8">
+          <svg class="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-[#9CA3AF] pointer-events-none" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+          <input type="text" placeholder="Поиск акции..." oninput="filterStocks(this.value)"
+            class="w-full h-14 pl-12 pr-4 bg-[#1F2937] border border-[rgba(75,85,99,0.4)] rounded-lg text-[#F9FAFB] placeholder:text-[#9CA3AF] focus:outline-none focus:border-[#3B82F6] focus:ring-2 focus:ring-[rgba(59,130,246,0.2)] transition-all text-sm">
+        </div>
+
+        <!-- Popular Stocks -->
+        <div id="stocks-list" class="space-y-3"></div>
+
+        <!-- CTA -->
+        <button onclick="showDashboard()"
+          class="mt-8 w-full h-12 bg-[#3B82F6] hover:bg-[#2563EB] text-white rounded-lg font-semibold transition-all hover:shadow-lg hover:shadow-[rgba(59,130,246,0.25)] flex items-center justify-center gap-2 text-sm">
+          Начать анализ
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="22,7 13.5,15.5 8.5,10.5 2,17"/><polyline points="16,7 22,7 22,13"/></svg>
+        </button>
+      </div>
+
+      <!-- Right: decorative chart -->
+      <div class="hidden lg:block relative">
+        <div class="absolute inset-0 bg-gradient-to-br from-[rgba(59,130,246,0.08)] to-[rgba(14,165,233,0.08)] rounded-2xl blur-3xl"></div>
+        <div class="relative bg-[#1F2937] border border-[rgba(75,85,99,0.4)] rounded-2xl p-8">
+          <div class="mb-4 flex items-center justify-between">
+            <div>
+              <div class="font-mono font-semibold text-xl">SBER · Сбербанк</div>
+              <div class="text-sm text-[#9CA3AF] mt-0.5">Московская биржа</div>
+            </div>
+            <div class="text-right">
+              <div class="font-mono font-bold text-2xl">287.50 <span class="text-base font-medium">₽</span></div>
+              <div class="text-sm font-mono font-semibold text-[#10B981]">+2.45%</div>
+            </div>
+          </div>
+          <div id="deco-chart" class="relative h-64 flex items-end justify-around px-2 pb-2"></div>
+          <div class="mt-4 flex justify-between text-xs text-[#9CA3AF] font-mono">
+            <span>Мин: 282.10</span><span>Объём: 1.2B ₽</span><span>Макс: 289.30</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </main>
+
+  <!-- Top Stocks Section -->
+  <section class="max-w-7xl mx-auto px-6 py-16">
+    <div class="bg-[#1F2937] border border-[rgba(75,85,99,0.4)] rounded-lg p-6">
+
+      <!-- Table Header -->
+      <div class="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4">
+        <div>
+          <h3 class="font-semibold flex items-center gap-2 mb-1">
+            <svg class="w-5 h-5 text-[#3B82F6]" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16a4 4 0 0 1-4-4V6a2 2 0 0 1 2-2"/><path d="M12 10h6"/><path d="M12 14h6"/><path d="M12 18h6"/></svg>
+            Топ акций с максимальным влиянием новостей
+          </h3>
+          <p class="text-xs text-[#9CA3AF]">Акции, цены которых сильнее всего изменились под влиянием новостного фона</p>
+        </div>
+        <div class="flex items-center gap-3 flex-shrink-0">
+          <div class="flex gap-1 bg-[#374151] rounded-lg p-1">
+            <button onclick="setLandingFilter('all')" data-filter="all" class="filter-btn px-3 py-1.5 text-xs font-medium rounded transition-colors bg-[#0A0E1A] shadow-sm">Все</button>
+            <button onclick="setLandingFilter('positive')" data-filter="positive" class="filter-btn px-3 py-1.5 text-xs font-medium rounded transition-colors text-[#9CA3AF] hover:bg-[#0A0E1A]/50">Рост</button>
+            <button onclick="setLandingFilter('negative')" data-filter="negative" class="filter-btn px-3 py-1.5 text-xs font-medium rounded transition-colors text-[#9CA3AF] hover:bg-[#0A0E1A]/50">Падение</button>
+          </div>
+          <button onclick="toggleLandingSort()" class="flex items-center gap-2 px-3 py-1.5 text-xs font-medium border border-[rgba(75,85,99,0.4)] rounded-lg hover:bg-[#374151] transition-colors" id="sort-btn">
+            <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="m21 16-4 4-4-4"/><path d="M17 20V4"/><path d="m3 8 4-4 4 4"/><path d="M7 4v16"/></svg>
+            <span id="sort-label">По влиянию</span>
+          </button>
+        </div>
+      </div>
+
+      <div id="landing-stocks-table" class="space-y-4"></div>
+
+      <!-- Footer stats -->
+      <div class="mt-6 pt-6 border-t border-[rgba(75,85,99,0.4)]">
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div class="text-center"><div class="text-2xl font-bold font-mono" id="stat-total">4</div><div class="text-xs text-[#9CA3AF] mt-1">Акций в списке</div></div>
+          <div class="text-center"><div class="text-2xl font-bold font-mono text-[#10B981]" id="stat-positive">3</div><div class="text-xs text-[#9CA3AF] mt-1">Растущих</div></div>
+          <div class="text-center"><div class="text-2xl font-bold font-mono text-[#EF4444]" id="stat-negative">1</div><div class="text-xs text-[#9CA3AF] mt-1">Падающих</div></div>
+          <div class="text-center"><div class="text-2xl font-bold font-mono" id="stat-news">8</div><div class="text-xs text-[#9CA3AF] mt-1">Всего новостей</div></div>
         </div>
       </div>
     </div>
+  </section>
+
+  <!-- Footer -->
+  <footer class="border-t border-[rgba(75,85,99,0.4)] mt-4">
+    <div class="max-w-7xl mx-auto px-6 py-8">
+      <div class="flex flex-col md:flex-row items-center justify-between gap-4 text-sm text-[#9CA3AF]">
+        <div>© 2026 NewsImpact Analyzer. Все права защищены.</div>
+        <div class="flex gap-6">
+          <a href="#" class="hover:text-[#F9FAFB] transition-colors">О проекте</a>
+          <a href="#" class="hover:text-[#F9FAFB] transition-colors">API</a>
+          <a href="#" class="hover:text-[#F9FAFB] transition-colors">Документация</a>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+</div><!-- /page-landing -->
+
+
+<!-- ═══════════════════════════════════════════════
+     NEWS PAGE
+════════════════════════════════════════════════ -->
+<div id="page-news" class="page">
+
+  <!-- Header -->
+  <header class="sticky top-0 z-50 border-b border-[rgba(75,85,99,0.4)] bg-[rgba(31,41,55,0.6)] backdrop-blur-md">
+    <div class="max-w-7xl mx-auto px-6">
+      <div class="flex items-center justify-between h-16">
+        <div class="flex items-center gap-3">
+          <button onclick="showLanding()" class="p-2 hover:bg-[#374151] rounded-lg transition-colors">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></svg>
+          </button>
+          <div class="w-8 h-8 rounded-lg bg-[#3B82F6] flex items-center justify-center">
+            <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16a4 4 0 0 1-4-4V6a2 2 0 0 1 2-2"/><path d="M12 10h6"/><path d="M12 14h6"/><path d="M12 18h6"/></svg>
+          </div>
+          <div>
+            <h1 class="text-lg font-semibold leading-tight">Новости рынка</h1>
+            <p class="text-xs text-[#9CA3AF]">Общеэкономические и политические события</p>
+          </div>
+        </div>
+        <div class="flex items-center gap-3">
+          <!-- Sentiment filter -->
+          <div class="flex gap-1 bg-[#374151] rounded-lg p-1">
+            <button onclick="setNewsFilter('all')"      data-nf="all"      class="news-filter-btn px-3 py-1.5 text-xs font-medium rounded transition-colors bg-[#0A0E1A] shadow-sm">Все</button>
+            <button onclick="setNewsFilter('positive')" data-nf="positive" class="news-filter-btn px-3 py-1.5 text-xs font-medium rounded transition-colors text-[#9CA3AF]">Позитивные</button>
+            <button onclick="setNewsFilter('negative')" data-nf="negative" class="news-filter-btn px-3 py-1.5 text-xs font-medium rounded transition-colors text-[#9CA3AF]">Негативные</button>
+          </div>
+          <span id="news-page-count" class="text-xs text-[#9CA3AF] font-mono"></span>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <div class="max-w-7xl mx-auto px-6 py-8">
+    <div id="news-page-body">
+      <div class="flex flex-col items-center justify-center gap-3 py-16 text-[#9CA3AF]">
+        <div class="w-6 h-6 border-2 border-[rgba(75,85,99,0.4)] border-t-[#3B82F6] rounded-full spinner"></div>
+        <span class="text-sm">Загрузка новостей...</span>
+      </div>
+    </div>
   </div>
-</main>
 
+</div><!-- /page-news -->
+
+
+<!-- ═══════════════════════════════════════════════
+     DASHBOARD PAGE
+════════════════════════════════════════════════ -->
+<div id="page-dashboard" class="page">
+
+  <!-- Header -->
+  <header class="sticky top-0 z-50 border-b border-[rgba(75,85,99,0.4)] bg-[#1F2937]">
+    <div class="max-w-7xl mx-auto px-6 py-4">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center gap-4">
+          <button onclick="showLanding()" class="p-2 hover:bg-[#374151] rounded-lg transition-colors">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></svg>
+          </button>
+          <div class="flex items-center gap-3">
+            <svg class="w-8 h-8 text-[#3B82F6]" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M3 3v18h18"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></svg>
+            <div>
+              <h1 class="text-xl font-semibold leading-tight">News Impact Analyzer</h1>
+              <p class="text-sm text-[#9CA3AF]">Анализ влияния новостей на МОЭКС</p>
+            </div>
+          </div>
+        </div>
+        <div class="flex items-center gap-4">
+          <select id="dash-ticker" onchange="loadDashboardData(this.value)"
+            class="bg-[#0A0E1A] text-[#F9FAFB] border border-[rgba(75,85,99,0.4)] rounded-lg px-3 py-2 text-sm font-medium focus:outline-none focus:border-[#3B82F6] cursor-pointer">
+            <option>Загрузка...</option>
+          </select>
+          <div class="text-sm text-[#9CA3AF] hidden md:flex items-center gap-2">
+            <svg class="w-4 h-4 inline" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+            <span id="dash-date">—</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <div class="max-w-7xl mx-auto px-6 py-8">
+
+    <!-- Metrics Row -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-6 mb-8">
+      <div class="bg-[#1F2937] border border-[rgba(75,85,99,0.4)] rounded-lg p-5">
+        <div class="text-sm text-[#9CA3AF] mb-2">Текущая цена</div>
+        <div class="font-mono text-2xl font-semibold mb-1" id="m-price">—</div>
+        <div class="text-sm font-medium font-mono flex items-center gap-1" id="m-change"><span class="text-[#9CA3AF]">—</span></div>
+      </div>
+      <div class="bg-[#1F2937] border border-[rgba(75,85,99,0.4)] rounded-lg p-5">
+        <div class="text-sm text-[#9CA3AF] mb-2">Новостей за период</div>
+        <div class="font-mono text-2xl font-semibold mb-1" id="m-news-count">—</div>
+        <div class="text-sm font-medium font-mono text-[#0EA5E9]" id="m-news-sub">загружается</div>
+      </div>
+      <div class="bg-[#1F2937] border border-[rgba(75,85,99,0.4)] rounded-lg p-5">
+        <div class="text-sm text-[#9CA3AF] mb-2">Позитивных новостей</div>
+        <div class="font-mono text-2xl font-semibold mb-1 text-[#10B981]" id="m-positive">—</div>
+        <div class="text-sm font-medium font-mono text-[#9CA3AF]" id="m-positive-pct">—</div>
+      </div>
+      <div class="bg-[#1F2937] border border-[rgba(75,85,99,0.4)] rounded-lg p-5">
+        <div class="text-sm text-[#9CA3AF] mb-2">Негативных новостей</div>
+        <div class="font-mono text-2xl font-semibold mb-1 text-[#EF4444]" id="m-negative">—</div>
+        <div class="text-sm font-medium font-mono text-[#9CA3AF]" id="m-negative-pct">—</div>
+      </div>
+    </div>
+
+    <!-- Main Grid: Chart + Events -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+
+      <!-- Stock Chart -->
+      <div class="lg:col-span-2 bg-[#1F2937] border border-[rgba(75,85,99,0.4)] rounded-lg p-6">
+        <div class="mb-4">
+          <div class="flex items-center gap-3 mb-1">
+            <div class="w-10 h-10 rounded-lg overflow-hidden bg-[#374151] flex-shrink-0">
+              <img id="chart-logo" src="" alt="" class="w-full h-full object-contain">
+            </div>
+            <div>
+              <div class="flex items-baseline gap-3">
+                <h2 class="text-2xl font-semibold font-mono" id="chart-ticker">—</h2>
+                <span class="text-lg font-mono" id="chart-price">—</span>
+                <span class="font-mono font-medium" id="chart-change"></span>
+              </div>
+            </div>
+          </div>
+          <div class="flex gap-6 text-sm text-[#9CA3AF] font-mono" id="chart-stats">
+            <span>Макс: —</span><span>Мин: —</span><span>Объём: —</span>
+          </div>
+        </div>
+        <div class="flex items-center justify-between mb-4">
+          <div class="flex gap-2">
+            <button onclick="setPeriod('1Д')" data-period="1Д" class="period-btn px-4 py-1.5 rounded-md text-sm font-medium bg-[#374151] text-[#F9FAFB] hover:bg-[#374151]/80">1Д</button>
+            <button onclick="setPeriod('1Н')" data-period="1Н" class="period-btn px-4 py-1.5 rounded-md text-sm font-medium bg-[#374151] text-[#F9FAFB] hover:bg-[#374151]/80">1Н</button>
+            <button onclick="setPeriod('1М')" data-period="1М" class="period-btn px-4 py-1.5 rounded-md text-sm font-medium bg-[#374151] text-[#F9FAFB] hover:bg-[#374151]/80">1М</button>
+            <button onclick="setPeriod('1Г')" data-period="1Г" class="period-btn px-4 py-1.5 rounded-md text-sm font-medium bg-[#3B82F6] text-white">1Г</button>
+          </div>
+          <div class="flex gap-1 bg-[#374151] rounded-lg p-1">
+            <button onclick="setChartMode('candles')" id="mode-candles" title="Свечи"
+              class="chart-mode-btn p-1.5 rounded transition-colors bg-[#0A0E1A] text-white">
+              <svg class="w-4 h-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+                <line x1="3" y1="2" x2="3" y2="14"/><rect x="1" y="5" width="4" height="5" rx="0.5"/>
+                <line x1="8" y1="1" x2="8" y2="15"/><rect x="6" y="3" width="4" height="7" rx="0.5"/>
+                <line x1="13" y1="2" x2="13" y2="14"/><rect x="11" y="7" width="4" height="4" rx="0.5"/>
+              </svg>
+            </button>
+            <button onclick="setChartMode('line')" id="mode-line" title="Линия"
+              class="chart-mode-btn p-1.5 rounded transition-colors text-[#9CA3AF] hover:text-[#F9FAFB]">
+              <svg class="w-4 h-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="1,13 5,7 9,10 13,3"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+        <div id="lw-chart"></div>
+      </div>
+
+      <!-- Events Sidebar -->
+      <div class="bg-[#1F2937] border border-[rgba(75,85,99,0.4)] rounded-lg p-5 flex flex-col">
+        <div class="mb-4 flex items-center gap-2">
+          <svg class="w-4 h-4 text-[#9CA3AF]" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          <h3 class="font-semibold text-sm">События</h3>
+          <span id="events-count" class="ml-auto text-xs bg-[#374151] text-[#9CA3AF] px-2 py-0.5 rounded-full">0</span>
+        </div>
+        <div id="events-list" class="space-y-3 overflow-y-auto flex-1">
+          <div class="flex flex-col items-center justify-center gap-3 py-8 text-[#9CA3AF]">
+            <div class="w-5 h-5 border-2 border-[rgba(75,85,99,0.4)] border-t-[#3B82F6] rounded-full spinner"></div>
+            <span class="text-sm">Загрузка событий...</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Top Impacted Stocks Table (real data) -->
+    <div class="bg-[#1F2937] border border-[rgba(75,85,99,0.4)] rounded-lg p-6">
+      <div class="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4">
+        <div>
+          <h3 class="font-semibold flex items-center gap-2 mb-1">
+            <svg class="w-5 h-5 text-[#3B82F6]" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16a4 4 0 0 1-4-4V6a2 2 0 0 1 2-2"/><path d="M12 10h6"/><path d="M12 14h6"/><path d="M12 18h6"/></svg>
+            Новости с наибольшим влиянием
+          </h3>
+          <p class="text-xs text-[#9CA3AF]">Реальные события и их измеренное воздействие на котировки</p>
+        </div>
+        <div class="flex items-center gap-3 flex-shrink-0">
+          <div class="flex gap-1 bg-[#374151] rounded-lg p-1">
+            <button onclick="setDashFilter('all')" data-filter="all" class="dash-filter-btn px-3 py-1.5 text-xs font-medium rounded transition-colors bg-[#0A0E1A] shadow-sm">Все</button>
+            <button onclick="setDashFilter('positive')" data-filter="positive" class="dash-filter-btn px-3 py-1.5 text-xs font-medium rounded transition-colors text-[#9CA3AF]">Рост</button>
+            <button onclick="setDashFilter('negative')" data-filter="negative" class="dash-filter-btn px-3 py-1.5 text-xs font-medium rounded transition-colors text-[#9CA3AF]">Падение</button>
+          </div>
+        </div>
+      </div>
+      <div id="dash-news-table" class="space-y-2">
+        <div class="flex items-center justify-center py-8 text-[#9CA3AF] text-sm">Загрузка данных...</div>
+      </div>
+    </div>
+
+  </div>
+</div><!-- /page-dashboard -->
+
+
+<!-- ═══════════════════════════════════════════════
+     SCRIPTS
+════════════════════════════════════════════════ -->
 <script>
-// ─── Chart setup ──────────────────────────────────────────────────
-const chartEl = document.getElementById('chart');
-const chart = LightweightCharts.createChart(chartEl, {
-  layout:    { background: { color: '#0d1117' }, textColor: '#8b949e' },
-  grid:      { vertLines: { color: '#1c2128' }, horzLines: { color: '#1c2128' } },
-  crosshair: { mode: LightweightCharts.CrosshairMode.Normal },
-  rightPriceScale: { borderColor: '#30363d' },
-  timeScale: { borderColor: '#30363d', timeVisible: true, secondsVisible: false },
+// ─── Static data ──────────────────────────────────────────────────
+let ALL_STOCKS = []; // заполняется из /api/prices
+let TOP_IMPACT_STOCKS = []; // заполняется из /api/top-impact
+
+const DEMO_STOCKS_DATA = [
+  { ticker: 'SBER', name: 'Сбербанк',  price: '287.50', change: '+4.23%', positive: true, news: [
+    { id:1, time:'13:00', title:'ЦБ сохранил ключевую ставку на уровне 16%', desc:'Решение Центрального Банка поддержало финансовый сектор, что позитивно сказалось на котировках банков', impact:'+2.1%', positive: true },
+    { id:2, time:'14:30', title:'Представлена новая стратегия развития до 2027', desc:'Анонсированы планы по цифровой трансформации и расширению экосистемы банка', impact:'+2.3%', positive: true },
+  ]},
+  { ticker: 'GAZP', name: 'Газпром',   price: '156.32', change: '-3.87%', positive: false, news: [
+    { id:3, time:'11:15', title:'Санкции США на энергетический сектор', desc:'Новый пакет ограничительных мер может повлиять на экспорт газа в европейские страны', impact:'-3.5%', positive: false },
+    { id:4, time:'15:45', title:'Снижение объёма поставок в ЕС', desc:'Квартальный отчёт показал падение объёмов экспорта на 12% год к году', impact:'-0.8%', positive: false },
+  ]},
+  { ticker: 'LKOH', name: 'Лукойл',   price: '6 845',  change: '+3.15%', positive: true, news: [
+    { id:5, time:'10:30', title:'Рост цен на нефть Brent до $85/барр', desc:'Геополитическая обстановка на Ближнем Востоке поддерживает высокие цены на энергоносители', impact:'+2.4%', positive: true },
+    { id:6, time:'12:00', title:'Увеличение дивидендных выплат', desc:'Совет директоров рекомендовал повысить дивиденды на 15% относительно прошлого года', impact:'+1.1%', positive: true },
+  ]},
+  { ticker: 'YNDX', name: 'Яндекс',   price: '3 210',  change: '+5.67%', positive: true, news: [
+    { id:7, time:'09:15', title:'Запуск новой AI-платформы YandexGPT Pro', desc:'Компания представила обновлённую версию языковой модели с расширенными возможностями для бизнеса', impact:'+3.8%', positive: true },
+    { id:8, time:'16:20', title:'Партнёрство с крупным ритейлером', desc:'Подписано соглашение о внедрении технологий Яндекса в розничные сети', impact:'+2.1%', positive: true },
+  ]},
+];
+
+const EVENT_TYPES = [
+  { category:'Решения ЦБ',              avgImpact:'+2.4%', count:23, positiveRate:78, volatility:'Высокая',     positive:true },
+  { category:'Корпоративная отчётность', avgImpact:'+1.8%', count:156,positiveRate:62, volatility:'Средняя',     positive:true },
+  { category:'Санкции',                 avgImpact:'-3.2%', count:47, positiveRate:12, volatility:'Очень высокая',positive:false },
+  { category:'Макроэкономика',           avgImpact:'+0.9%', count:89, positiveRate:54, volatility:'Средняя',     positive:true },
+  { category:'Геополитика',             avgImpact:'-1.5%', count:134,positiveRate:31, volatility:'Высокая',     positive:false },
+  { category:'Дивиденды',               avgImpact:'+2.1%', count:42, positiveRate:89, volatility:'Низкая',      positive:true },
+];
+
+// ─── Chart instance ───────────────────────────────────────────────
+let lwChart = null;
+let lwCandles = null;
+let lwLine = null;
+let chartMode = 'candles'; // 'candles' | 'line'
+
+function setChartMode(mode) {
+  chartMode = mode;
+  document.querySelectorAll('.chart-mode-btn').forEach(b => {
+    const active = b.id === `mode-${mode}`;
+    b.classList.toggle('bg-[#0A0E1A]', active);
+    b.classList.toggle('text-white', active);
+    b.classList.toggle('text-[#9CA3AF]', !active);
+  });
+  if (allCandlesData.length) renderDashChart(allCandlesData, allImpactsData);
+}
+
+// ─── Page routing ──────────────────────────────────────────────────
+function showPage(id) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+function showDashboard(ticker) {
+  showPage('page-dashboard');
+  closeAllDropdowns();
+  if (!lwChart) initChart();
+  history.pushState(null, '', ticker ? `/stock/${ticker}` : '/stock');
+  initDashboard(ticker || null);
+}
+
+function showLanding() {
+  showPage('page-landing');
+  history.pushState(null, '', '/');
+}
+
+// ─── Dropdown helpers ─────────────────────────────────────────────
+function toggleDropdown(id) {
+  const el = document.getElementById(id);
+  const isOpen = el.classList.contains('open');
+  closeAllDropdowns();
+  if (!isOpen) el.classList.add('open');
+}
+
+function closeAllDropdowns() {
+  document.querySelectorAll('.dropdown-menu').forEach(m => m.classList.remove('open'));
+}
+
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('#products-wrap') && !e.target.closest('#user-wrap')) {
+    closeAllDropdowns();
+  }
 });
 
-const candleSeries = chart.addCandlestickSeries({
-  upColor:      '#3fb950',
-  downColor:    '#f85149',
-  borderVisible: false,
-  wickUpColor:  '#3fb950',
-  wickDownColor: '#f85149',
-});
+// ─── Landing: decorative candlestick chart ────────────────────────
+(function buildDecoChart() {
+  const candles = [
+    {o:280,c:285,h:287,l:278,up:true},{o:285,c:282,h:286,l:280,up:false},
+    {o:282,c:288,h:290,l:281,up:true},{o:288,c:284,h:289,l:283,up:false},
+    {o:284,c:290,h:292,l:283,up:true},{o:290,c:287,h:291,l:285,up:false},
+    {o:287,c:295,h:297,l:286,up:true},{o:295,c:292,h:296,l:290,up:false},
+    {o:292,c:298,h:300,l:291,up:true},{o:298,c:302,h:304,l:297,up:true},
+    {o:302,c:299,h:303,l:297,up:false},{o:299,c:306,h:308,l:298,up:true},
+  ];
+  const max = 310, min = 270, range = max - min;
+  const getY = p => ((max - p) / range) * 100;
+  const cont = document.getElementById('deco-chart');
+  if (!cont) return;
 
-// fallback line series (если нет свечей)
-const lineSeries = chart.addLineSeries({ color: '#58a6ff', lineWidth: 2 });
-lineSeries.applyOptions({ visible: false });
+  candles.forEach((c, i) => {
+    const wickTop    = getY(c.h);
+    const wickBot    = getY(c.l);
+    const bodyTop    = getY(Math.max(c.o, c.c));
+    const bodyBot    = getY(Math.min(c.o, c.c));
+    const bodyH      = Math.max(bodyBot - bodyTop, 1.5);
+    const color      = c.up ? '#10B981' : '#EF4444';
 
-new ResizeObserver(() => {
-  const w = document.getElementById('chart-wrap');
-  chart.applyOptions({ width: w.clientWidth, height: w.clientHeight });
-}).observe(document.getElementById('chart-wrap'));
+    const wrap = document.createElement('div');
+    wrap.className = 'relative flex-1';
+    wrap.style.cssText = 'height:100%; max-width:22px;';
 
-// ─── State ────────────────────────────────────────────────────────
-let currentTicker = null;
+    const wick = document.createElement('div');
+    wick.style.cssText = `position:absolute;left:50%;transform:translateX(-50%);width:1.5px;background:${color};opacity:0.5;top:${wickTop}%;height:${wickBot - wickTop}%`;
 
-// ─── Init ─────────────────────────────────────────────────────────
-async function init() {
+    const body = document.createElement('div');
+    body.className = 'candle-bar';
+    body.style.cssText = `position:absolute;left:50%;transform:translateX(-50%);width:100%;border-radius:2px;background:${color};top:${bodyTop}%;height:${bodyH}%`;
+
+    wrap.appendChild(wick);
+    wrap.appendChild(body);
+
+    if (c.up && i > 7) {
+      const dot = document.createElement('div');
+      dot.style.cssText = `position:absolute;left:50%;transform:translateX(-50%);width:6px;height:6px;border-radius:50%;background:${color};box-shadow:0 0 8px ${color};top:calc(${wickTop}% - 8px);animation:spin 3s linear infinite;`;
+      wrap.appendChild(dot);
+    }
+    cont.appendChild(wrap);
+  });
+})();
+
+// ─── Landing: stocks list ─────────────────────────────────────────
+let landingFilter = 'all';
+let landingSort = 'impact';
+let stockSearchQuery = '';
+
+async function loadLandingStocks() {
+  const cont = document.getElementById('stocks-list');
+  cont.innerHTML = `<div class="flex items-center justify-center gap-2 py-6 text-[#9CA3AF] text-sm">
+    <div class="w-4 h-4 border-2 border-[rgba(75,85,99,0.4)] border-t-[#3B82F6] rounded-full spinner"></div>
+    Загрузка акций...
+  </div>`;
+
+  try {
+    const res = await fetch('/api/prices');
+    ALL_STOCKS = await res.json().catch(() => []);
+  } catch {
+    ALL_STOCKS = [];
+  }
+  renderLandingStocks();
+}
+
+function filterStocks(q) {
+  stockSearchQuery = q.toLowerCase().trim();
+  renderLandingStocks();
+}
+
+function renderLandingStocks() {
+  const cont = document.getElementById('stocks-list');
+
+  let list = ALL_STOCKS.length ? ALL_STOCKS : [];
+
+  if (stockSearchQuery) {
+    list = list.filter(s =>
+      s.ticker.toLowerCase().includes(stockSearchQuery) ||
+      (s.short_name || '').toLowerCase().includes(stockSearchQuery) ||
+      (s.name || '').toLowerCase().includes(stockSearchQuery)
+    );
+  }
+
+  // Без поиска — показываем топ-5 по абсолютному изменению
+  const showAll = stockSearchQuery.length > 0;
+  const display = showAll ? list : list.slice().sort((a,b) => Math.abs(b.change_percent) - Math.abs(a.change_percent)).slice(0, 5);
+
+  if (display.length === 0) {
+    cont.innerHTML = `<div class="text-center py-6 text-[#9CA3AF] text-sm">Ничего не найдено</div>`;
+    return;
+  }
+
+  cont.innerHTML = display.map(s => {
+    const positive = s.change_percent >= 0;
+    const sign = positive ? '+' : '';
+    const label = s.short_name || s.ticker;
+    const changeStr = `${sign}${s.change_percent.toFixed(2)}%`;
+    const priceStr = s.last_price >= 1000
+      ? s.last_price.toLocaleString('ru-RU', { maximumFractionDigits: 0 })
+      : s.last_price.toFixed(2);
+
+    return `
+    <button onclick="openTicker('${esc(s.ticker)}')" class="w-full bg-[#1F2937] border border-[rgba(75,85,99,0.4)] rounded-lg p-4 hover:bg-[#374151]/30 hover:border-[rgba(59,130,246,0.4)] transition-all group text-left">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-lg overflow-hidden bg-[#374151] group-hover:bg-[rgba(59,130,246,0.1)] transition-colors flex-shrink-0">
+            <img src="/api/logo/${esc(s.ticker)}" alt="${esc(s.ticker)}" class="w-full h-full object-contain" loading="lazy">
+          </div>
+          <div class="min-w-0">
+            <div class="font-semibold text-sm truncate">${esc(label)}</div>
+            <div class="text-xs text-[#9CA3AF] font-mono">${esc(s.ticker)}</div>
+          </div>
+        </div>
+        <div class="text-right flex-shrink-0 ml-3">
+          <div class="font-mono font-semibold text-sm">${esc(priceStr)} ₽</div>
+          <div class="text-xs font-mono font-medium ${positive ? 'text-[#10B981]' : 'text-[#EF4444]'}">${esc(changeStr)}</div>
+        </div>
+      </div>
+    </button>`;
+  }).join('');
+
+  // Подсказка «ещё N акций» если не ищем
+  if (!showAll && list.length > 5) {
+    cont.innerHTML += `<div class="text-center pt-2 text-xs text-[#6B7280]">
+      Найдено ${list.length} акций — введите название для поиска
+    </div>`;
+  }
+}
+
+function openTicker(ticker) {
+  showDashboard(ticker);
+}
+
+async function loadTopImpactStocks() {
+  const cont = document.getElementById('landing-stocks-table');
+  cont.innerHTML = `<div class="flex items-center justify-center gap-2 py-10 text-[#9CA3AF] text-sm">
+    <div class="w-4 h-4 border-2 border-[rgba(75,85,99,0.4)] border-t-[#3B82F6] rounded-full spinner"></div>
+    Загрузка данных...
+  </div>`;
+  try {
+    const res = await fetch('/api/top-impact');
+    TOP_IMPACT_STOCKS = await res.json().catch(() => []);
+  } catch {
+    TOP_IMPACT_STOCKS = [];
+  }
+  renderLandingTopStocks();
+}
+
+function setLandingFilter(f) {
+  landingFilter = f;
+  document.querySelectorAll('.filter-btn').forEach(b => {
+    const active = b.dataset.filter === f;
+    b.classList.toggle('bg-[#0A0E1A]', active);
+    b.classList.toggle('shadow-sm', active);
+    b.classList.toggle('text-[#9CA3AF]', !active);
+  });
+  renderLandingTopStocks();
+}
+
+function toggleLandingSort() {
+  landingSort = landingSort === 'impact' ? 'price' : 'impact';
+  document.getElementById('sort-label').textContent = landingSort === 'impact' ? 'По влиянию' : 'По изменению';
+  renderLandingTopStocks();
+}
+
+function renderLandingTopStocks() {
+  const cont = document.getElementById('landing-stocks-table');
+
+  if (!TOP_IMPACT_STOCKS.length) {
+    cont.innerHTML = `<div class="text-center py-10 text-[#9CA3AF] text-sm">Нет данных — новости ещё не проанализированы</div>`;
+    document.getElementById('stat-total').textContent = '0';
+    document.getElementById('stat-positive').textContent = '0';
+    document.getElementById('stat-negative').textContent = '0';
+    document.getElementById('stat-news').textContent = '0';
+    return;
+  }
+
+  let data = [...TOP_IMPACT_STOCKS];
+  if (landingFilter === 'positive') data = data.filter(s => s.net_impact >= 0);
+  if (landingFilter === 'negative') data = data.filter(s => s.net_impact < 0);
+  data.sort((a, b) => landingSort === 'impact'
+    ? b.total_impact - a.total_impact
+    : Math.abs(b.change_percent) - Math.abs(a.change_percent)
+  );
+
+  document.getElementById('stat-total').textContent = data.length;
+  document.getElementById('stat-positive').textContent = data.filter(s => s.net_impact >= 0).length;
+  document.getElementById('stat-negative').textContent = data.filter(s => s.net_impact < 0).length;
+  document.getElementById('stat-news').textContent = data.reduce((acc, s) => acc + s.news_count, 0);
+
+  const maxImpact = data.reduce((m, s) => Math.max(m, s.total_impact), 0.001);
+  const rankColors = [
+    'bg-[rgba(245,158,11,0.15)] text-[#F59E0B]',
+    'bg-[#374151] text-[#9CA3AF]',
+    'bg-[rgba(205,127,50,0.15)] text-[#CD7F32]',
+    'bg-[#374151]/50 text-[#6B7280]',
+  ];
+
+  cont.innerHTML = data.map((s, i) => {
+    const positive = s.net_impact >= 0;
+    const changeSign = s.change_percent >= 0 ? '+' : '';
+    const priceStr = s.last_price >= 1000
+      ? s.last_price.toLocaleString('ru-RU', { maximumFractionDigits: 0 })
+      : s.last_price.toFixed(2);
+    const impactPct = Math.round((s.total_impact / maxImpact) * 100);
+    const impactStr = (positive ? '+' : '') + s.net_impact.toFixed(2);
+    const latestAgo = s.latest_news_at ? relTime(s.latest_news_at) : '';
+
+    return `
+    <div class="border border-[rgba(75,85,99,0.4)] rounded-lg overflow-hidden hover:border-[rgba(59,130,246,0.3)] transition-all group cursor-pointer" onclick="openTicker('${esc(s.ticker)}')">
+      <div class="grid items-center gap-4 p-4 bg-[rgba(55,65,81,0.2)]" style="grid-template-columns:2rem 1fr auto auto auto;">
+        <div class="w-8 h-8 rounded-lg flex items-center justify-center font-bold text-sm ${rankColors[Math.min(i, 3)]}">${i + 1}</div>
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-lg overflow-hidden bg-[rgba(59,130,246,0.1)] group-hover:bg-[rgba(59,130,246,0.2)] transition-colors flex-shrink-0">
+            <img src="/api/logo/${esc(s.ticker)}" alt="${esc(s.ticker)}" class="w-full h-full object-contain" loading="lazy">
+          </div>
+          <div class="min-w-0">
+            <div class="font-semibold text-sm truncate">${esc(s.short_name || s.name || s.ticker)}</div>
+            <div class="text-xs text-[#9CA3AF] font-mono">${esc(s.ticker)}</div>
+          </div>
+        </div>
+        <div class="text-right">
+          ${s.last_price > 0 ? `<div class="font-mono font-semibold">${esc(priceStr)} ₽</div>` : '<div class="text-xs text-[#6B7280]">—</div>'}
+          <div class="text-sm font-mono font-semibold ${s.change_percent >= 0 ? 'text-[#10B981]' : 'text-[#EF4444]'} flex items-center gap-0.5 justify-end">
+            ${s.change_percent >= 0 ? trendUpSvg('w-3 h-3') : trendDownSvg('w-3 h-3')}
+            ${changeSign}${s.change_percent.toFixed(2)}%
+          </div>
+        </div>
+        <div class="flex gap-2">
+          <div class="px-3 py-1 rounded-md bg-[rgba(14,165,233,0.1)] border border-[rgba(14,165,233,0.25)] text-center min-w-[60px]">
+            <div class="text-xs text-[#9CA3AF]">Новостей</div>
+            <div class="text-base font-bold font-mono text-[#0EA5E9]">${s.news_count}</div>
+          </div>
+          <div class="px-3 py-1 rounded-md ${positive ? 'bg-[rgba(16,185,129,0.08)] border border-[rgba(16,185,129,0.2)]' : 'bg-[rgba(239,68,68,0.08)] border border-[rgba(239,68,68,0.2)]'} text-center min-w-[72px]">
+            <div class="text-xs text-[#9CA3AF]">Влияние</div>
+            <div class="text-base font-bold font-mono ${positive ? 'text-[#10B981]' : 'text-[#EF4444]'}">${esc(impactStr)}</div>
+          </div>
+        </div>
+        <div class="text-xs text-[#9CA3AF] hidden md:flex items-center gap-1 flex-shrink-0">
+          <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          ${esc(latestAgo)}
+        </div>
+      </div>
+      <div class="h-1 bg-[rgba(75,85,99,0.2)]">
+        <div class="h-1 ${positive ? 'bg-[#10B981]' : 'bg-[#EF4444]'} impact-bar-fill transition-all duration-500" style="width:${impactPct}%"></div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function relTime(unixSec) {
+  const diff = Math.floor(Date.now() / 1000) - unixSec;
+  if (diff < 60) return 'только что';
+  if (diff < 3600) return Math.floor(diff / 60) + ' мин назад';
+  if (diff < 86400) return Math.floor(diff / 3600) + ' ч назад';
+  return Math.floor(diff / 86400) + ' дн назад';
+}
+
+// ─── Chart init ───────────────────────────────────────────────────
+function initChart() {
+  const el = document.getElementById('lw-chart');
+  lwChart = LightweightCharts.createChart(el, {
+    layout:    { background: { color: '#1F2937' }, textColor: '#9CA3AF' },
+    grid:      { vertLines: { color: 'rgba(75,85,99,0.15)' }, horzLines: { color: 'rgba(75,85,99,0.15)' } },
+    crosshair: { mode: LightweightCharts.CrosshairMode.Normal },
+    rightPriceScale: { borderColor: 'rgba(75,85,99,0.3)', autoScale: true },
+    timeScale: { borderColor: 'rgba(75,85,99,0.3)', timeVisible: true, secondsVisible: false, fixLeftEdge: true, fixRightEdge: true },
+    handleScale: { axisPressedMouseMove: { time: true, price: false } },
+  });
+
+  lwLine = lwChart.addLineSeries({ color: '#3B82F6', lineWidth: 2 });
+  lwCandles = lwChart.addCandlestickSeries({
+    upColor: '#10B981', downColor: '#EF4444',
+    borderVisible: false, wickUpColor: '#10B981', wickDownColor: '#EF4444',
+  });
+  lwCandles.applyOptions({ visible: false });
+
+  new ResizeObserver(() => {
+    lwChart.applyOptions({ width: el.clientWidth, height: el.clientHeight });
+  }).observe(el);
+}
+
+// ─── Dashboard init & data loading ───────────────────────────────
+let dashFilter = 'all';
+let currentImpacts = [];
+let allCandlesData = [];
+let allImpactsData = [];
+let currentPeriod = '1Г';
+const PERIOD_SECONDS = { '1Д': 86400, '1Н': 7*86400, '1М': 30*86400, '1Г': 365*86400 };
+
+function applyPeriodView() {
+  if (!lwChart || !allCandlesData.length) return;
+  const now = Math.floor(Date.now() / 1000);
+  lwChart.timeScale().setVisibleRange({
+    from: now - PERIOD_SECONDS[currentPeriod],
+    to: now,
+  });
+  updatePeriodChange();
+}
+
+function updatePeriodChange() {
+  if (!allCandlesData.length) return;
+  const now = Math.floor(Date.now() / 1000);
+  const from = now - PERIOD_SECONDS[currentPeriod];
+  const visible = allCandlesData.filter(c => c.time >= from);
+  if (!visible.length) return;
+
+  const first = visible[0];
+  const last  = visible[visible.length - 1];
+  const change    = last.close - first.open;
+  const changePct = first.open > 0 ? (change / first.open) * 100 : 0;
+  const sign = change >= 0 ? '+' : '';
+  const cls  = change > 0 ? 'text-[#10B981]' : change < 0 ? 'text-[#EF4444]' : 'text-[#9CA3AF]';
+  const text = `${sign}${change.toFixed(2)} (${sign}${changePct.toFixed(2)}%)`;
+
+  const changeEl = document.getElementById('chart-change');
+  if (changeEl) { changeEl.textContent = text; changeEl.className = `font-mono font-medium text-sm ${cls}`; }
+
+  const mChangeEl = document.getElementById('m-change');
+  if (mChangeEl) {
+    mChangeEl.innerHTML = `<span class="${cls} font-mono flex items-center gap-1">
+      ${change > 0 ? trendUpSvg('w-4 h-4') : change < 0 ? trendDownSvg('w-4 h-4') : ''}
+      ${esc(text)}
+    </span>`;
+  }
+}
+
+function setPeriod(p) {
+  currentPeriod = p;
+  document.querySelectorAll('.period-btn').forEach(b => {
+    const active = b.dataset.period === p;
+    b.classList.toggle('bg-[#3B82F6]', active);
+    b.classList.toggle('text-white', active);
+    b.classList.toggle('bg-[#374151]', !active);
+    b.classList.toggle('text-[#F9FAFB]', !active);
+  });
+  applyPeriodView();
+}
+
+async function initDashboard(initialTicker) {
+  const today = new Date().toLocaleDateString('ru-RU', { day:'2-digit', month:'long', year:'numeric' });
+  document.getElementById('dash-date').textContent = today;
+
+  if (initialTicker) {
+    document.getElementById('chart-ticker').textContent = initialTicker;
+    const logoEl = document.getElementById('chart-logo');
+    if (logoEl) { logoEl.src = `/api/logo/${initialTicker}`; logoEl.alt = initialTicker; }
+  }
+
   try {
     const res = await fetch('/api/tickers');
     const tickers = await res.json();
-    const sel = document.getElementById('ticker-select');
+    const sel = document.getElementById('dash-ticker');
     sel.innerHTML = '';
-
     if (!tickers || tickers.length === 0) {
       sel.innerHTML = '<option>Нет данных</option>';
-      showNewsEmpty('Нет данных о тикерах', 'Запустите cmd/api для загрузки справочника акций');
+      showDashEmpty();
       return;
     }
-
     tickers.forEach(t => {
       const opt = document.createElement('option');
       opt.value = t.ticker;
-      opt.textContent = t.short_name && t.short_name !== t.ticker
-        ? `${t.ticker} · ${t.short_name}`
-        : t.ticker;
+      opt.textContent = t.short_name && t.short_name !== t.ticker ? `${t.ticker} · ${t.short_name}` : t.ticker;
       sel.appendChild(opt);
     });
 
-    sel.addEventListener('change', () => loadData(sel.value));
-    loadData(tickers[0].ticker);
-  } catch (e) {
-    showNewsEmpty('Ошибка подключения', 'Не удалось загрузить список тикеров');
+    // Если передан конкретный тикер — выбираем его, иначе первый в списке
+    const target = initialTicker && tickers.find(t => t.ticker === initialTicker)
+      ? initialTicker
+      : tickers[0].ticker;
+    sel.value = target;
+    loadDashboardData(target);
+  } catch {
+    showDashEmpty();
   }
 }
 
-// ─── Load ticker data ─────────────────────────────────────────────
-async function loadData(ticker) {
-  currentTicker = ticker;
-  document.getElementById('news-body').innerHTML = '<div class="state-box"><div class="spinner"></div></div>';
-  document.getElementById('price-val').textContent = '—';
-  document.getElementById('price-chg').textContent = '';
+async function loadDashboardData(ticker) {
+  history.replaceState(null, '', `/stock/${ticker}`);
+  document.getElementById('chart-ticker').textContent = ticker;
+  const logoEl = document.getElementById('chart-logo');
+  if (logoEl) { logoEl.src = `/api/logo/${ticker}`; logoEl.alt = ticker; }
+  document.getElementById('chart-price').textContent = '—';
+  document.getElementById('chart-change').textContent = '';
+  document.getElementById('chart-stats').innerHTML = `<span class="text-[#9CA3AF] text-sm">Загрузка графика...</span>`;
+  document.getElementById('events-list').innerHTML = `
+    <div class="flex flex-col items-center justify-center gap-3 py-8 text-[#9CA3AF]">
+      <div class="w-5 h-5 border-2 border-[rgba(75,85,99,0.4)] border-t-[#3B82F6] rounded-full spinner"></div>
+      <span class="text-sm">Загрузка событий...</span>
+    </div>`;
 
-  const [candlesRes, impactRes, priceRes] = await Promise.all([
-    fetch(`/api/candles?ticker=${ticker}`),
-    fetch(`/api/news-impact?ticker=${ticker}`),
-    fetch(`/api/current-price?ticker=${ticker}`),
+  // Шаг 1: быстрые запросы к БД — цена и события
+  const [impactRes, priceRes] = await Promise.all([
+    fetch(`/api/news-impact?ticker=${ticker}`).catch(()=>null),
+    fetch(`/api/current-price?ticker=${ticker}`).catch(()=>null),
   ]);
+  const impacts = impactRes ? await impactRes.json().catch(()=>[]) : [];
+  const price   = priceRes  ? await priceRes.json().catch(()=>null) : null;
 
-  const candles = await candlesRes.json().catch(() => []);
-  const impacts = await impactRes.json().catch(() => []);
-  const price   = await priceRes.json().catch(() => null);
+  currentImpacts = impacts || [];
+  allImpactsData = impacts || [];
 
-  if (ticker !== currentTicker) return; // отменено, пока загружали
+  renderDashPrice(price);
+  renderDashMetrics(impacts || []);
+  renderDashEvents(impacts || []);
+  renderDashNewsTable();
 
-  renderPrice(price);
-  renderChart(candles || [], impacts || []);
-  renderNews(impacts || []);
+  // Шаг 2: свечи — может потребоваться запрос к MOEX ISS
+  const candlesRes = await fetch(`/api/candles?ticker=${ticker}`).catch(()=>null);
+  const candles = candlesRes ? await candlesRes.json().catch(()=>[]) : [];
+
+  allCandlesData = candles || [];
+
+  currentPeriod = '1Г';
+  document.querySelectorAll('.period-btn').forEach(b => {
+    const active = b.dataset.period === '1Г';
+    b.classList.toggle('bg-[#3B82F6]', active);
+    b.classList.toggle('text-white', active);
+    b.classList.toggle('bg-[#374151]', !active);
+    b.classList.toggle('text-[#F9FAFB]', !active);
+  });
+
+  renderDashChart(allCandlesData, allImpactsData);
 }
 
-// ─── Price badge ──────────────────────────────────────────────────
-function renderPrice(p) {
-  const valEl = document.getElementById('price-val');
-  const chgEl = document.getElementById('price-chg');
+function renderDashPrice(p) {
+  const priceEl  = document.getElementById('chart-price');
+  const changeEl = document.getElementById('chart-change');
+  const mPrice   = document.getElementById('m-price');
+  const mChange  = document.getElementById('m-change');
 
   if (!p || !p.last_price) {
-    valEl.textContent = '—';
-    chgEl.textContent = '';
+    priceEl.textContent = '—'; changeEl.textContent = '';
+    mPrice.textContent = '—';  mChange.innerHTML = '<span class="text-[#9CA3AF]">—</span>';
     return;
   }
-
-  valEl.textContent = p.last_price.toFixed(2) + ' ₽';
 
   const sign = p.change >= 0 ? '+' : '';
-  chgEl.textContent = `${sign}${p.change.toFixed(2)} (${sign}${p.change_percent.toFixed(2)}%)`;
-  chgEl.className = 'price-chg ' + (p.change > 0 ? 'up' : p.change < 0 ? 'down' : 'flat');
+  const chgText = `${sign}${p.change.toFixed(2)} (${sign}${p.change_percent.toFixed(2)}%)`;
+  const cls = p.change > 0 ? 'text-[#10B981]' : p.change < 0 ? 'text-[#EF4444]' : 'text-[#9CA3AF]';
+
+  priceEl.textContent = p.last_price.toFixed(2) + ' ₽';
+  changeEl.textContent = chgText;
+  changeEl.className = `font-mono font-medium text-sm ${cls}`;
+
+  mPrice.textContent = p.last_price.toFixed(2) + ' ₽';
+  mChange.innerHTML = `<span class="${cls} font-mono flex items-center gap-1">
+    ${p.change > 0 ? trendUpSvg('w-4 h-4') : p.change < 0 ? trendDownSvg('w-4 h-4') : ''}
+    ${esc(chgText)}
+  </span>`;
 }
 
-// ─── Chart ────────────────────────────────────────────────────────
-function renderChart(candles, impacts) {
-  candleSeries.setMarkers([]);
+function renderDashMetrics(impacts) {
+  const pos = impacts.filter(i => i.direction === 'positive').length;
+  const neg = impacts.filter(i => i.direction === 'negative').length;
+  const total = impacts.length;
 
-  if (candles.length === 0) {
-    candleSeries.setData([]);
-    lineSeries.applyOptions({ visible: false });
+  document.getElementById('m-news-count').textContent = total;
+  document.getElementById('m-news-sub').textContent = total > 0 ? 'событий найдено' : 'нет данных';
+  document.getElementById('m-positive').textContent = pos;
+  document.getElementById('m-positive-pct').textContent = total ? Math.round(pos/total*100) + '%' : '—';
+  document.getElementById('m-negative').textContent = neg;
+  document.getElementById('m-negative-pct').textContent = total ? Math.round(neg/total*100) + '%' : '—';
+}
+
+function renderDashChart(candles, impacts) {
+  if (!lwChart) return;
+
+  lwCandles.setMarkers([]);
+  lwLine.setMarkers([]);
+
+  if (!candles || candles.length === 0) {
+    lwLine.setData([]);
+    lwCandles.setData([]);
+    document.getElementById('chart-stats').innerHTML = '<span class="text-[#9CA3AF]">Нет данных о свечах</span>';
     return;
   }
 
-  candleSeries.setData(candles);
-  lineSeries.applyOptions({ visible: false });
+  const markers = (impacts || [])
+    .filter(item => item.impact !== 0)
+    .map(item => ({
+      time: item.published_at,
+      position: item.direction === 'positive' ? 'belowBar' : 'aboveBar',
+      color: item.direction === 'positive' ? '#10B981' : item.direction === 'negative' ? '#EF4444' : '#9CA3AF',
+      shape: item.direction === 'positive' ? 'arrowUp' : item.direction === 'negative' ? 'arrowDown' : 'circle',
+      text: (item.impact > 0 ? '+' : '') + item.impact.toFixed(2),
+      size: item.strength === 'extreme' ? 3 : item.strength === 'strong' ? 2 : 1,
+    }))
+    .sort((a, b) => a.time - b.time);
 
-  // markers — сортируем по времени (обязательно)
-  if (impacts.length > 0) {
-    const markers = impacts
-      .map(item => ({
-        time:     item.published_at,
-        position: item.direction === 'positive' ? 'belowBar' : 'aboveBar',
-        color:    dirColor(item.direction),
-        shape:    item.direction === 'positive' ? 'arrowUp' : item.direction === 'negative' ? 'arrowDown' : 'circle',
-        text:     (item.impact > 0 ? '+' : '') + item.impact.toFixed(2),
-        size:     strengthSize(item.strength),
-      }))
-      .sort((a, b) => a.time - b.time);
-
-    candleSeries.setMarkers(markers);
+  if (chartMode === 'candles') {
+    const candleData = candles.map(c => ({ time: c.time, open: c.open, high: c.high, low: c.low, close: c.close }));
+    lwCandles.setData(candleData);
+    lwCandles.applyOptions({ visible: true });
+    lwCandles.setMarkers(markers);
+    lwLine.setData([]);
+    lwLine.applyOptions({ visible: false });
+  } else {
+    const lineData = candles.map(c => ({ time: c.time, value: c.close }));
+    lwLine.setData(lineData);
+    lwLine.applyOptions({ visible: true });
+    lwLine.setMarkers(markers);
+    lwCandles.setData([]);
+    lwCandles.applyOptions({ visible: false });
   }
+  applyPeriodView();
 
-  chart.timeScale().fitContent();
+  const hi = Math.max(...candles.map(c => c.high)).toFixed(2);
+  const lo = Math.min(...candles.map(c => c.low)).toFixed(2);
+  const isDaily = candles.length > 1 && (candles[1].time - candles[0].time) >= 86000;
+  const period = isDaily ? `${candles.length} дн.` : `${candles.length} свечей`;
+  document.getElementById('chart-stats').innerHTML =
+    `<span>Макс: ${hi}</span><span>Мин: ${lo}</span><span>${period}</span>`;
 }
 
-function dirColor(dir) {
-  return dir === 'positive' ? '#3fb950' : dir === 'negative' ? '#f85149' : '#8b949e';
-}
-
-function strengthSize(s) {
-  return s === 'extreme' ? 3 : s === 'strong' ? 2 : 1;
-}
-
-// ─── News table ───────────────────────────────────────────────────
-function renderNews(impacts) {
-  document.getElementById('news-count').textContent = impacts.length;
-
+function renderDashEvents(impacts) {
+  document.getElementById('events-count').textContent = impacts.length;
   if (impacts.length === 0) {
-    showNewsEmpty(
-      'Нет данных о влиянии',
-      'Запустите cmd/parser для парсинга новостей'
-    );
+    document.getElementById('events-list').innerHTML =
+      '<div class="text-center py-8 text-[#9CA3AF] text-sm">Нет событий</div>';
     return;
   }
 
-  const rows = impacts.map(item => {
-    const dt    = new Date(item.published_at * 1000);
-    const dStr  = dt.toLocaleString('ru-RU', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' });
-    const sign  = item.impact >= 0 ? '+' : '';
-    const dCls  = `dir-${item.direction}`;
-    const bCls  = `badge b-${item.strength}`;
-    const impact = `${sign}${item.impact.toFixed(3)}`;
+  const colors = { positive:'#10B981', negative:'#EF4444', neutral:'#9CA3AF' };
+  const sorted = [...impacts].sort((a,b) => Math.abs(b.impact) - Math.abs(a.impact)).slice(0, 15);
 
-    return `<tr onclick="jumpToTime(${item.published_at})">
-      <td class="td-title">
-        <a href="${esc(item.link)}" target="_blank" rel="noopener">${esc(item.title)}</a>
+  document.getElementById('events-list').innerHTML = sorted.map(item => {
+    const color = colors[item.direction] || '#9CA3AF';
+    const dt = new Date(item.published_at * 1000);
+    const time = dt.toLocaleTimeString('ru-RU', { hour:'2-digit', minute:'2-digit' });
+    const pct = Math.min(Math.abs(item.impact) * 20, 80);
+    const sign = item.impact >= 0 ? '+' : '';
+
+    return `
+    <div class="event-card border border-[rgba(75,85,99,0.4)] rounded-md overflow-hidden hover:border-[rgba(59,130,246,0.4)] hover:bg-[rgba(59,130,246,0.03)] cursor-pointer" onclick="jumpToTime(${item.published_at})">
+      <div class="p-3">
+        <div class="flex items-start gap-2">
+          <div class="w-6 h-6 rounded flex items-center justify-center flex-shrink-0 mt-0.5" style="background:${color}20;border:1.5px solid ${color}">
+            <div class="w-1.5 h-1.5 rounded-full" style="background:${color}"></div>
+          </div>
+          <div class="flex-1 min-w-0">
+            <div class="flex items-baseline justify-between gap-2 mb-1">
+              <span class="font-mono text-[10px] text-[#9CA3AF]">${esc(time)}</span>
+              <span class="font-mono text-xs font-bold" style="color:${color}">${sign}${item.impact.toFixed(2)}</span>
+            </div>
+            <h4 class="font-semibold text-xs leading-tight mb-1 line-clamp-2">${esc(item.title)}</h4>
+            <div class="text-[10px] text-[#9CA3AF]">${esc(item.source_name || '')}</div>
+          </div>
+        </div>
+      </div>
+      <div class="h-0.5 w-full" style="background:${color}30">
+        <div class="impact-bar-fill h-full" style="background:${color};width:${pct}%"></div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function renderDashNewsTable() {
+  let data = [...currentImpacts];
+  if (dashFilter !== 'all') data = data.filter(i => i.direction === dashFilter);
+  data.sort((a,b) => Math.abs(b.impact) - Math.abs(a.impact));
+
+  if (data.length === 0) {
+    document.getElementById('dash-news-table').innerHTML =
+      '<div class="text-center py-8 text-[#9CA3AF] text-sm">Нет данных</div>';
+    return;
+  }
+
+  document.getElementById('dash-news-table').innerHTML = data.slice(0, 20).map(item => {
+    const positive = item.direction === 'positive';
+    const neutral  = item.direction === 'neutral';
+    const dt = new Date(item.published_at * 1000);
+    const dStr = dt.toLocaleString('ru-RU', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' });
+    const sign = item.impact >= 0 ? '+' : '';
+    const impactCls = positive ? 'text-[#10B981]' : neutral ? 'text-[#9CA3AF]' : 'text-[#EF4444]';
+    const bgCls = positive ? 'bg-[rgba(16,185,129,0.1)]' : neutral ? 'bg-[rgba(55,65,81,0.4)]' : 'bg-[rgba(239,68,68,0.1)]';
+
+    return `
+    <div class="flex items-start gap-3 p-4 border border-[rgba(75,85,99,0.3)] rounded-lg hover:bg-[rgba(55,65,81,0.2)] transition-colors">
+      <div class="p-2 rounded-lg flex-shrink-0 ${bgCls}">
+        ${positive ? trendUpSvg(`w-4 h-4 ${impactCls}`) : neutral ? minusSvg(`w-4 h-4 ${impactCls}`) : trendDownSvg(`w-4 h-4 ${impactCls}`)}
+      </div>
+      <div class="flex-1 min-w-0">
+        <div class="flex items-start justify-between gap-3 mb-1">
+          <a href="${esc(item.link || '#')}" target="_blank" rel="noopener" class="font-medium text-sm leading-tight hover:text-[#3B82F6] transition-colors line-clamp-1">${esc(item.title)}</a>
+          <div class="flex items-center gap-2 flex-shrink-0">
+            <span class="text-xs text-[#9CA3AF] font-mono">${esc(dStr)}</span>
+            <span class="px-2 py-0.5 rounded font-mono text-xs font-semibold ${bgCls} ${impactCls}">${sign}${item.impact.toFixed(3)}</span>
+          </div>
+        </div>
+        <div class="flex items-center gap-2">
+          <span class="text-xs text-[#9CA3AF]">${esc(item.source_name || '')}</span>
+          <span class="px-2 py-0.5 rounded-full text-[10px] font-medium ${bgCls} ${impactCls}">${esc(item.strength || '')}</span>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function setDashFilter(f) {
+  dashFilter = f;
+  document.querySelectorAll('.dash-filter-btn').forEach(b => {
+    const active = b.dataset.filter === f;
+    b.classList.toggle('bg-[#0A0E1A]', active);
+    b.classList.toggle('shadow-sm', active);
+    b.classList.toggle('text-[#9CA3AF]', !active);
+    b.classList.toggle('text-[#F9FAFB]', active);
+  });
+  renderDashNewsTable();
+}
+
+function renderImpactTable() {
+  const total = EVENT_TYPES.reduce((s,e)=>s+e.count,0);
+  document.getElementById('impact-table-footer').textContent =
+    `Данные за последние 30 дней • Анализ на основе ${total} событий`;
+
+  document.getElementById('impact-table-body').innerHTML = EVENT_TYPES.map(e => {
+    const voltColors = {
+      'Очень высокая': 'bg-[rgba(239,68,68,0.1)] text-[#EF4444]',
+      'Высокая':        'bg-[rgba(245,158,11,0.1)] text-[#F59E0B]',
+      'Средняя':        'bg-[rgba(139,92,246,0.1)] text-[#8B5CF6]',
+      'Низкая':         'bg-[rgba(16,185,129,0.1)] text-[#10B981]',
+    };
+    return `
+    <tr class="border-b border-[rgba(75,85,99,0.3)] hover:bg-[rgba(55,65,81,0.2)] transition-colors stat-row">
+      <td class="py-4 px-4 font-medium text-sm">${esc(e.category)}</td>
+      <td class="py-4 px-4 text-right font-mono font-semibold ${e.positive ? 'text-[#10B981]' : 'text-[#EF4444]'}">${esc(e.avgImpact)}</td>
+      <td class="py-4 px-4 text-right font-mono text-[#9CA3AF] text-sm">${e.count}</td>
+      <td class="py-4 px-4 text-right">
+        <div class="flex items-center justify-end gap-3">
+          <div class="w-20 h-1.5 bg-[#374151] rounded-full overflow-hidden">
+            <div class="h-full bg-[#10B981] rounded-full" style="width:${e.positiveRate}%"></div>
+          </div>
+          <span class="font-mono text-sm w-9 text-right text-[#9CA3AF]">${e.positiveRate}%</span>
+        </div>
       </td>
-      <td class="td-source">${esc(item.source_name)}</td>
-      <td class="td-time">${dStr}</td>
-      <td style="text-align:right">
-        <span class="impact-num ${dCls}">${impact}</span>
+      <td class="py-4 px-4 text-right">
+        <span class="px-3 py-1 rounded-md text-xs font-medium ${voltColors[e.volatility] || ''}">${esc(e.volatility)}</span>
       </td>
-      <td><span class="${bCls}">${item.strength}</span></td>
-      <td><span class="${dCls}">${dirIcon(item.direction)} ${item.direction}</span></td>
     </tr>`;
   }).join('');
-
-  document.getElementById('news-body').innerHTML = `
-    <table>
-      <thead>
-        <tr>
-          <th>Заголовок</th>
-          <th>Источник</th>
-          <th>Время</th>
-          <th style="text-align:right">Impact</th>
-          <th>Сила</th>
-          <th>Направление</th>
-        </tr>
-      </thead>
-      <tbody>${rows}</tbody>
-    </table>`;
 }
 
-function dirIcon(dir) {
-  return dir === 'positive' ? '↑' : dir === 'negative' ? '↓' : '○';
+function showDashEmpty() {
+  document.getElementById('events-list').innerHTML =
+    '<div class="text-center py-8 text-[#9CA3AF] text-sm">Ошибка подключения к API</div>';
+  document.getElementById('dash-news-table').innerHTML =
+    '<div class="text-center py-8 text-[#9CA3AF] text-sm">Не удалось загрузить данные</div>';
 }
 
-function showNewsEmpty(title, hint) {
-  document.getElementById('news-count').textContent = '0';
-  document.getElementById('news-body').innerHTML = `
-    <div class="state-box">
-      <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-        <path stroke-linecap="round" stroke-linejoin="round"
-          d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293
-             l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-      </svg>
-      <p>${esc(title)}</p>
-      <small>${esc(hint)}</small>
-    </div>`;
-}
-
-// ─── Interactivity ────────────────────────────────────────────────
 function jumpToTime(ts) {
-  try {
-    chart.timeScale().scrollToPosition(0, false);
-    const coord = chart.timeScale().timeToCoordinate(ts);
-    if (coord !== null) chart.timeScale().scrollToRealTime();
-  } catch (_) {}
+  try { lwChart.timeScale().scrollToPosition(0, false); } catch(_){}
 }
 
-// ─── Utils ────────────────────────────────────────────────────────
+// ─── SVG helpers ──────────────────────────────────────────────────
+function trendUpSvg(cls) {
+  return `<svg class="${cls}" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="22,7 13.5,15.5 8.5,10.5 2,17"/><polyline points="16,7 22,7 22,13"/></svg>`;
+}
+function trendDownSvg(cls) {
+  return `<svg class="${cls}" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="22,17 13.5,8.5 8.5,13.5 2,7"/><polyline points="16,17 22,17 22,11"/></svg>`;
+}
+function minusSvg(cls) {
+  return `<svg class="${cls}" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M5 12h14"/></svg>`;
+}
 function esc(str) {
-  if (!str) return '';
-  return String(str)
-    .replace(/&/g,'&amp;')
-    .replace(/</g,'&lt;')
-    .replace(/>/g,'&gt;')
-    .replace(/"/g,'&quot;');
+  if (str == null) return '';
+  // Decode HTML entities from API (e.g. &#34; → "), then re-escape for safe DOM insertion
+  const ta = document.createElement('textarea');
+  ta.innerHTML = String(str);
+  const decoded = ta.value;
+  return decoded.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
-// ─── Start ────────────────────────────────────────────────────────
-init();
+// ─── News page ────────────────────────────────────────────────────
+let allGeneralNews = [];
+let newsPageFilter = 'all';
+
+function showNews() {
+  showPage('page-news');
+  closeAllDropdowns();
+  history.pushState(null, '', '/news');
+  loadGeneralNews();
+}
+
+async function loadGeneralNews() {
+  document.getElementById('news-page-body').innerHTML = `
+    <div class="flex flex-col items-center justify-center gap-3 py-16 text-[#9CA3AF]">
+      <div class="w-6 h-6 border-2 border-[rgba(75,85,99,0.4)] border-t-[#3B82F6] rounded-full spinner"></div>
+      <span class="text-sm">Загрузка новостей...</span>
+    </div>`;
+
+  try {
+    const res = await fetch('/api/news/general');
+    allGeneralNews = await res.json().catch(() => []);
+  } catch {
+    allGeneralNews = [];
+  }
+  renderNewsPage();
+}
+
+function setNewsFilter(f) {
+  newsPageFilter = f;
+  document.querySelectorAll('.news-filter-btn').forEach(b => {
+    const active = b.dataset.nf === f;
+    b.classList.toggle('bg-[#0A0E1A]', active);
+    b.classList.toggle('shadow-sm', active);
+    b.classList.toggle('text-[#9CA3AF]', !active);
+    b.classList.toggle('text-[#F9FAFB]', active);
+  });
+  renderNewsPage();
+}
+
+function renderNewsPage() {
+  let data = [...allGeneralNews];
+
+  if (newsPageFilter === 'positive') data = data.filter(n => n.sentiment > 0.1);
+  if (newsPageFilter === 'negative') data = data.filter(n => n.sentiment < -0.1);
+
+  document.getElementById('news-page-count').textContent = data.length + ' новостей';
+
+  if (data.length === 0) {
+    document.getElementById('news-page-body').innerHTML = `
+      <div class="flex flex-col items-center justify-center gap-3 py-16 text-[#9CA3AF]">
+        <svg class="w-10 h-10 opacity-20" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16a4 4 0 0 1-4-4V6a2 2 0 0 1 2-2"/><path d="M12 10h6"/><path d="M12 14h6"/><path d="M12 18h6"/></svg>
+        <p class="text-sm font-medium text-[#D1D5DB]">Нет новостей</p>
+        <small class="text-xs">Попробуйте изменить фильтр или запустите парсер</small>
+      </div>`;
+    return;
+  }
+
+  // Группируем по дате
+  const grouped = {};
+  data.forEach(n => {
+    const dt = new Date(n.published_at * 1000);
+    const key = dt.toLocaleDateString('ru-RU', { day: '2-digit', month: 'long', year: 'numeric' });
+    if (!grouped[key]) grouped[key] = [];
+    grouped[key].push(n);
+  });
+
+  document.getElementById('news-page-body').innerHTML = Object.entries(grouped).map(([date, items]) => `
+    <div class="mb-8">
+      <div class="flex items-center gap-3 mb-4">
+        <h2 class="text-sm font-semibold text-[#9CA3AF] uppercase tracking-wider">${esc(date)}</h2>
+        <div class="flex-1 h-px bg-[rgba(75,85,99,0.3)]"></div>
+        <span class="text-xs text-[#6B7280] font-mono">${items.length}</span>
+      </div>
+      <div class="space-y-2">
+        ${items.map(n => {
+          const dt = new Date(n.published_at * 1000);
+          const time = dt.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+          const sentCls = n.sentiment > 0.1 ? 'text-[#10B981]' : n.sentiment < -0.1 ? 'text-[#EF4444]' : 'text-[#9CA3AF]';
+          const sentDot = n.sentiment > 0.1 ? 'bg-[#10B981]' : n.sentiment < -0.1 ? 'bg-[#EF4444]' : 'bg-[#9CA3AF]';
+          const href = n.link ? `href="${esc(n.link)}" target="_blank" rel="noopener"` : '';
+          return `
+          <div class="flex items-start gap-4 p-4 bg-[#1F2937] border border-[rgba(75,85,99,0.3)] rounded-lg hover:border-[rgba(59,130,246,0.3)] hover:bg-[rgba(31,41,55,0.8)] transition-all group">
+            <div class="flex-shrink-0 pt-1">
+              <div class="w-2 h-2 rounded-full ${sentDot}"></div>
+            </div>
+            <div class="flex-1 min-w-0">
+              <a ${href} class="font-medium text-sm leading-snug text-[#F9FAFB] hover:text-[#3B82F6] transition-colors group-hover:text-[#3B82F6] line-clamp-2">${esc(n.title)}</a>
+              <div class="flex items-center gap-3 mt-1.5">
+                <span class="text-xs text-[#9CA3AF] font-mono">${esc(time)}</span>
+                <span class="text-xs text-[#6B7280]">·</span>
+                <span class="text-xs font-medium text-[#9CA3AF]">${esc(n.source_name)}</span>
+                ${n.sentiment !== 0 ? `<span class="text-xs font-mono ${sentCls}">${n.sentiment > 0 ? '+' : ''}${n.sentiment.toFixed(2)}</span>` : ''}
+              </div>
+            </div>
+          </div>`;
+        }).join('')}
+      </div>
+    </div>
+  `).join('');
+}
+
+// ─── Boot ─────────────────────────────────────────────────────────
+
+function routeFromPath(path, push) {
+  if (path.startsWith('/stock')) {
+    const ticker = path.split('/')[2] ? path.split('/')[2].toUpperCase() : null;
+    showPage('page-dashboard');
+    if (!lwChart) initChart();
+    if (push) history.pushState(null, '', path);
+    initDashboard(ticker);
+  } else if (path === '/news') {
+    showPage('page-news');
+    if (push) history.pushState(null, '', '/news');
+    loadGeneralNews();
+  } else {
+    showPage('page-landing');
+    if (push) history.pushState(null, '', '/');
+  }
+}
+
+window.addEventListener('popstate', () => routeFromPath(location.pathname, false));
+
+// Initial route
+routeFromPath(location.pathname, false);
+
+loadLandingStocks();
+loadTopImpactStocks();
 </script>
 </body>
 </html>

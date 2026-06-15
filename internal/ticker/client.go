@@ -44,6 +44,27 @@ func (c *MOEXClient) GetCurrentMarketData() ([]MarketData, error) {
 	return parseMarketData(result.Marketdata.Columns, result.Marketdata.Data), nil
 }
 
+// GetAllSecurities — справочник всех акций TQBR (тикер, название, сектор)
+func (c *MOEXClient) GetAllSecurities() ([]Security, error) {
+	resp, err := c.client.R().Get("/engines/stock/markets/shares/boards/TQBR/securities.json")
+	if err != nil {
+		return nil, err
+	}
+
+	var result struct {
+		Securities struct {
+			Columns []string        `json:"columns"`
+			Data    [][]interface{} `json:"data"`
+		} `json:"securities"`
+	}
+
+	if err := json.Unmarshal(resp.Body(), &result); err != nil {
+		return nil, err
+	}
+
+	return parseSecurities(result.Securities.Columns, result.Securities.Data), nil
+}
+
 // GetCandles — исторические свечи
 func (c *MOEXClient) GetCandles(ticker string, interval int, from, till time.Time) ([]Candle, error) {
 	url := fmt.Sprintf("/engines/stock/markets/shares/boards/TQBR/securities/%s/candles.json", ticker)

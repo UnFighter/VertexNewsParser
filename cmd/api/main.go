@@ -36,13 +36,17 @@ func main() {
 		log.Println("✅ Справочник акций обновлён")
 	}
 
-	log.Println("📈 Загружаем исторические данные...")
-	for _, t := range []string{"SBER", "GAZP", "YNDX", "LKOH", "ROSN", "VTBR", "GMKN"} {
-		if err := tickerService.LoadHistoricalCandles(t, 30, 60); err != nil {
-			log.Printf("⚠️ Ошибка загрузки истории %s: %v", t, err)
-		} else {
-			log.Printf("✅ Свечи загружены: %s", t)
-		}
+	log.Println("📈 Загружаем исторические данные для всех акций MOEX...")
+	// 5 параллельных воркеров — не перегружаем MOEX ISS
+	if err := tickerService.LoadAllHistoricalCandles(30, 60, 5); err != nil {
+		log.Printf("⚠️ Ошибка загрузки часовых свечей: %v", err)
+	} else {
+		log.Println("✅ Часовые свечи загружены")
+	}
+	if err := tickerService.LoadAllHistoricalCandles(365, 24, 5); err != nil {
+		log.Printf("⚠️ Ошибка загрузки дневных свечей: %v", err)
+	} else {
+		log.Println("✅ Дневные свечи загружены")
 	}
 
 	log.Println("🔄 Обновляем текущие котировки...")

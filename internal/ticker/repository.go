@@ -17,19 +17,20 @@ func NewTickerRepository(db *sqlx.DB) *TickerRepository {
 
 // SaveSecurities — сохраняет справочник акций
 func (r *TickerRepository) SaveSecurities(securities []Security) error {
-	query := `
+	const query = `
 		INSERT INTO securities (ticker, name, short_name, sector)
 		VALUES (:ticker, :name, :short_name, :sector)
-		ON CONFLICT (ticker) 
-		DO UPDATE SET 
-			name = EXCLUDED.name,
+		ON CONFLICT (ticker)
+		DO UPDATE SET
+			name       = EXCLUDED.name,
 			short_name = EXCLUDED.short_name,
-			sector = EXCLUDED.sector,
+			sector     = EXCLUDED.sector,
 			updated_at = NOW()`
 
-	_, err := r.db.NamedExec(query, securities)
-	if err != nil {
-		return fmt.Errorf("failed to save securities: %w", err)
+	for _, sec := range securities {
+		if _, err := r.db.NamedExec(query, sec); err != nil {
+			log.Printf("SaveSecurities: skip %s: %v", sec.Ticker, err)
+		}
 	}
 	return nil
 }

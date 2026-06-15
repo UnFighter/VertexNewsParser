@@ -5,6 +5,30 @@ import (
 	"time"
 )
 
+func parseSecurities(columns []string, data [][]interface{}) []Security {
+	colIndex := make(map[string]int)
+	for i, col := range columns {
+		colIndex[col] = i
+	}
+
+	var result []Security
+	for _, row := range data {
+		ticker := getString(row, colIndex["SECID"])
+		if ticker == "" {
+			continue
+		}
+		result = append(result, Security{
+			Ticker:    ticker,
+			ShortName: getString(row, colIndex["SHORTNAME"]),
+			Name:      getString(row, colIndex["SECNAME"]),
+			ISIN:      getString(row, colIndex["ISIN"]),
+			Sector:    getString(row, colIndex["SECTORID"]),
+			IsActive:  true,
+		})
+	}
+	return result
+}
+
 func parseMarketData(columns []string, data [][]interface{}) []MarketData {
 	var result []MarketData
 	colIndex := make(map[string]int)

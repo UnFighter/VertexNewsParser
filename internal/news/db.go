@@ -22,6 +22,7 @@ func MustConnectDB(ctx context.Context) *pgxpool.Pool {
 		log.Fatal("Failed to parse DB config:", err)
 	}
 	config.MaxConns = 20
+	config.ConnConfig.RuntimeParams["statement_timeout"] = "30000"
 
 	pool, err := pgxpool.NewWithConfig(ctx, config)
 	if err != nil {
@@ -64,20 +65,22 @@ func MustInitDB(ctx context.Context, pool *pgxpool.Pool) {
 		CREATE INDEX IF NOT EXISTS idx_news_hash ON news(title_hash);
 
 		CREATE TABLE IF NOT EXISTS news_impact (
-			id              SERIAL PRIMARY KEY,
-			news_id         INT NOT NULL,
-			ticker          TEXT NOT NULL,
-			impact          DOUBLE PRECISION NOT NULL,
-			direction       TEXT NOT NULL,
-			strength        TEXT NOT NULL,
-			quality_score   DOUBLE PRECISION NOT NULL,
-			market_response DOUBLE PRECISION NOT NULL,
-			sentiment       DOUBLE PRECISION NOT NULL,
-			calculated_at   TIMESTAMPTZ DEFAULT NOW(),
+			id               SERIAL PRIMARY KEY,
+			news_id          INT NOT NULL,
+			ticker           TEXT NOT NULL,
+			impact           DOUBLE PRECISION NOT NULL,
+			direction        TEXT NOT NULL,
+			strength         TEXT NOT NULL,
+			quality_score    DOUBLE PRECISION NOT NULL,
+			market_response  DOUBLE PRECISION NOT NULL,
+			sentiment        DOUBLE PRECISION NOT NULL,
+			ticker_mentioned BOOLEAN NOT NULL DEFAULT TRUE,
+			calculated_at    TIMESTAMPTZ DEFAULT NOW(),
 			UNIQUE (news_id, ticker)
 		);
-		CREATE INDEX IF NOT EXISTS idx_news_impact_ticker  ON news_impact(ticker);
-		CREATE INDEX IF NOT EXISTS idx_news_impact_news_id ON news_impact(news_id);
+		CREATE INDEX IF NOT EXISTS idx_news_impact_ticker    ON news_impact(ticker);
+		CREATE INDEX IF NOT EXISTS idx_news_impact_news_id   ON news_impact(news_id);
+		CREATE INDEX IF NOT EXISTS idx_news_impact_mentioned ON news_impact(ticker_mentioned);
 	`)
 	if err != nil {
 		log.Fatal("DB init error:", err)

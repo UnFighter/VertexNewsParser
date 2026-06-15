@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -44,7 +45,11 @@ func (s *Service) Run(ctx context.Context, window time.Duration) error {
 	records := make([]NewsImpactRecord, 0, len(news)*len(metrics))
 	for _, n := range news {
 		sentiment, mentionScore, magnitude, factScore, keywordScore := scoreText(n.Title, n.Description)
+		titleLower := strings.ToLower(n.Title)
 		for _, m := range metrics {
+			mentioned := strings.Contains(titleLower, strings.ToLower(m.Ticker)) ||
+				(m.ShortName != "" && strings.Contains(titleLower, strings.ToLower(m.ShortName))) ||
+				(m.Name != "" && strings.Contains(titleLower, strings.ToLower(m.Name)))
 			input := NewsInput{
 				Sentiment:      sentiment,
 				MentionScore:   mentionScore,
@@ -62,14 +67,15 @@ func (s *Service) Run(ctx context.Context, window time.Duration) error {
 			}
 			result := CalculateNewsImpact(input)
 			records = append(records, NewsImpactRecord{
-				NewsID:         n.ID,
-				Ticker:         m.Ticker,
-				Impact:         result.Impact,
-				Direction:      result.Direction,
-				Strength:       result.Strength,
-				QualityScore:   result.QualityScore,
-				MarketResponse: result.MarketResponse,
-				Sentiment:      sentiment,
+				NewsID:          n.ID,
+				Ticker:          m.Ticker,
+				Impact:          result.Impact,
+				Direction:       result.Direction,
+				Strength:        result.Strength,
+				QualityScore:    result.QualityScore,
+				MarketResponse:  result.MarketResponse,
+				Sentiment:       sentiment,
+				TickerMentioned: mentioned,
 			})
 		}
 	}
@@ -115,8 +121,11 @@ func (s *Service) fetchMarketMetrics(ctx context.Context) ([]marketMetrics, erro
 			CASE
 				WHEN COALESCE(avg_vol.avg_volume, 0) = 0 THEN 1.0
 				ELSE cp.volume_today::float / avg_vol.avg_volume
-			END AS volume_ratio
+			END AS volume_ratio,
+			COALESCE(sec.short_name, '') AS short_name,
+			COALESCE(sec.name, '')       AS name
 		FROM current_prices cp
+		LEFT JOIN securities sec ON sec.ticker = cp.ticker
 		LEFT JOIN (
 			SELECT ticker, AVG(volume)::float AS avg_volume
 			FROM candles
@@ -138,7 +147,7 @@ func (s *Service) fetchMarketMetrics(ctx context.Context) ([]marketMetrics, erro
 	var result []marketMetrics
 	for rows.Next() {
 		var m marketMetrics
-		if err := rows.Scan(&m.Ticker, &m.ChangePercent, &m.VolumeRatio); err != nil {
+		if err := rows.Scan(&m.Ticker, &m.ChangePercent, &m.VolumeRatio, &m.ShortName, &m.Name); err != nil {
 			return nil, err
 		}
 		result = append(result, m)
@@ -149,22 +158,23 @@ func (s *Service) fetchMarketMetrics(ctx context.Context) ([]marketMetrics, erro
 func (s *Service) saveImpacts(ctx context.Context, records []NewsImpactRecord) error {
 	const query = `
 		INSERT INTO news_impact
-			(news_id, ticker, impact, direction, strength, quality_score, market_response, sentiment)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+			(news_id, ticker, impact, direction, strength, quality_score, market_response, sentiment, ticker_mentioned)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 		ON CONFLICT (news_id, ticker) DO UPDATE SET
-			impact          = EXCLUDED.impact,
-			direction       = EXCLUDED.direction,
-			strength        = EXCLUDED.strength,
-			quality_score   = EXCLUDED.quality_score,
-			market_response = EXCLUDED.market_response,
-			sentiment       = EXCLUDED.sentiment,
-			calculated_at   = NOW()`
+			impact           = EXCLUDED.impact,
+			direction        = EXCLUDED.direction,
+			strength         = EXCLUDED.strength,
+			quality_score    = EXCLUDED.quality_score,
+			market_response  = EXCLUDED.market_response,
+			sentiment        = EXCLUDED.sentiment,
+			ticker_mentioned = EXCLUDED.ticker_mentioned,
+			calculated_at    = NOW()`
 
 	batch := &pgx.Batch{}
 	for _, rec := range records {
 		batch.Queue(query,
 			rec.NewsID, rec.Ticker, rec.Impact, rec.Direction, rec.Strength,
-			rec.QualityScore, rec.MarketResponse, rec.Sentiment,
+			rec.QualityScore, rec.MarketResponse, rec.Sentiment, rec.TickerMentioned,
 		)
 	}
 
